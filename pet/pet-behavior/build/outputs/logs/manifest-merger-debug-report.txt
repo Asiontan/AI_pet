@@ -1,0 +1,16 @@
+-- Merging decision tree log ---
+manifest
+ADDED from D:\pet\pet\pet-behavior\build\intermediates\tmp\ProcessLibraryManifest\debug\tempAndroidManifest11582420876278726089.xml:2:13-83
+INJECTED from D:\pet\pet\pet-behavior\build\intermediates\tmp\ProcessLibraryManifest\debug\tempAndroidManifest11582420876278726089.xml:2:13-83
+	package
+		INJECTED from D:\pet\pet\pet-behavior\build\intermediates\tmp\ProcessLibraryManifest\debug\tempAndroidManifest11582420876278726089.xml
+	xmlns:android
+		ADDED from D:\pet\pet\pet-behavior\build\intermediates\tmp\ProcessLibraryManifest\debug\tempAndroidManifest11582420876278726089.xml:2:23-81
+uses-sdk
+INJECTED from D:\pet\pet\pet-behavior\build\intermediates\tmp\ProcessLibraryManifest\debug\tempAndroidManifest11582420876278726089.xml reason: use-sdk injection requested
+INJECTED from D:\pet\pet\pet-behavior\build\intermediates\tmp\ProcessLibraryManifest\debug\tempAndroidManifest11582420876278726089.xml
+INJECTED from D:\pet\pet\pet-behavior\build\intermediates\tmp\ProcessLibraryManifest\debug\tempAndroidManifest11582420876278726089.xml
+	android:targetSdkVersion
+		INJECTED from D:\pet\pet\pet-behavior\build\intermediates\tmp\ProcessLibraryManifest\debug\tempAndroidManifest11582420876278726089.xml
+	android:minSdkVersion
+		INJECTED from D:\pet\pet\pet-behavior\build\intermediates\tmp\ProcessLibraryManifest\debug\tempAndroidManifest11582420876278726089.xml
