@@ -1,16 +1,16 @@
 -- Merging decision tree log ---
 manifest
-ADDED from D:\pet\algorithm\algorithm-prediction\build\intermediates\tmp\ProcessLibraryManifest\debug\tempAndroidManifest14643089016975174971.xml:2:13-83
-INJECTED from D:\pet\algorithm\algorithm-prediction\build\intermediates\tmp\ProcessLibraryManifest\debug\tempAndroidManifest14643089016975174971.xml:2:13-83
+ADDED from D:\pet\algorithm\algorithm-prediction\build\intermediates\tmp\ProcessLibraryManifest\debug\tempAndroidManifest1220014801894147120.xml:2:13-83
+INJECTED from D:\pet\algorithm\algorithm-prediction\build\intermediates\tmp\ProcessLibraryManifest\debug\tempAndroidManifest1220014801894147120.xml:2:13-83
 	package
-		INJECTED from D:\pet\algorithm\algorithm-prediction\build\intermediates\tmp\ProcessLibraryManifest\debug\tempAndroidManifest14643089016975174971.xml
+		INJECTED from D:\pet\algorithm\algorithm-prediction\build\intermediates\tmp\ProcessLibraryManifest\debug\tempAndroidManifest1220014801894147120.xml
 	xmlns:android
-		ADDED from D:\pet\algorithm\algorithm-prediction\build\intermediates\tmp\ProcessLibraryManifest\debug\tempAndroidManifest14643089016975174971.xml:2:23-81
+		ADDED from D:\pet\algorithm\algorithm-prediction\build\intermediates\tmp\ProcessLibraryManifest\debug\tempAndroidManifest1220014801894147120.xml:2:23-81
 uses-sdk
-INJECTED from D:\pet\algorithm\algorithm-prediction\build\intermediates\tmp\ProcessLibraryManifest\debug\tempAndroidManifest14643089016975174971.xml reason: use-sdk injection requested
-INJECTED from D:\pet\algorithm\algorithm-prediction\build\intermediates\tmp\ProcessLibraryManifest\debug\tempAndroidManifest14643089016975174971.xml
-INJECTED from D:\pet\algorithm\algorithm-prediction\build\intermediates\tmp\ProcessLibraryManifest\debug\tempAndroidManifest14643089016975174971.xml
+INJECTED from D:\pet\algorithm\algorithm-prediction\build\intermediates\tmp\ProcessLibraryManifest\debug\tempAndroidManifest1220014801894147120.xml reason: use-sdk injection requested
+INJECTED from D:\pet\algorithm\algorithm-prediction\build\intermediates\tmp\ProcessLibraryManifest\debug\tempAndroidManifest1220014801894147120.xml
+INJECTED from D:\pet\algorithm\algorithm-prediction\build\intermediates\tmp\ProcessLibraryManifest\debug\tempAndroidManifest1220014801894147120.xml
 	android:targetSdkVersion
-		INJECTED from D:\pet\algorithm\algorithm-prediction\build\intermediates\tmp\ProcessLibraryManifest\debug\tempAndroidManifest14643089016975174971.xml
+		INJECTED from D:\pet\algorithm\algorithm-prediction\build\intermediates\tmp\ProcessLibraryManifest\debug\tempAndroidManifest1220014801894147120.xml
 	android:minSdkVersion
-		INJECTED from D:\pet\algorithm\algorithm-prediction\build\intermediates\tmp\ProcessLibraryManifest\debug\tempAndroidManifest14643089016975174971.xml
+		INJECTED from D:\pet\algorithm\algorithm-prediction\build\intermediates\tmp\ProcessLibraryManifest\debug\tempAndroidManifest1220014801894147120.xml

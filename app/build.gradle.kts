@@ -33,6 +33,16 @@ android {
     buildFeatures {
         buildConfig = true
     }
+
+    // 避免将不兼容16KB页面大小的JNI库打进APK（如某些第三方库可能携带的TFLite .so）
+    packaging {
+        jniLibs {
+            excludes += listOf(
+                "**/libtensorflowlite_jni.so",
+                "**/libimage_processing_util_jni.so"
+            )
+        }
+    }
 }
 
 dependencies {

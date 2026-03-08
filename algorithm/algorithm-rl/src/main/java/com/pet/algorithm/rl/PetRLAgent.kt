@@ -211,7 +211,7 @@ enum class PetAction {
     MOVE,        // 移动
     WAG_TAIL,    // 摇尾巴
     POPUP,       // 弹窗提醒
-    PLAY_SOUND   // 播放音效
+    PLAY_SOUND;   // 播放音效
     
     fun toBehaviorState(): BehaviorState {
         return when (this) {

@@ -30,8 +30,7 @@
         <service
             android:name="com.pet.pet.service.PetForegroundService"
             android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="dataSync" />
+            android:exported="false" />
         
     </application>
     

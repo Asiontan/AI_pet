@@ -27,8 +27,5 @@ dependencies {
     implementation(project(":core:core-eventbus"))
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-    // TensorFlow Lite for LSTM prediction
-    implementation("org.tensorflow:tensorflow-lite:2.14.0")
-    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
 }
 

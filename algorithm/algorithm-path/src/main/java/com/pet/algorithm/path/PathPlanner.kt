@@ -1,11 +1,9 @@
 package com.pet.algorithm.path
 
-import android.graphics.Point
 import android.graphics.PointF
 import android.graphics.Rect
 import com.pet.core.common.logger.PetLogger
 import kotlin.math.abs
-import kotlin.math.sqrt
 
 /**
  * A*路径规划算法实现
@@ -88,14 +86,12 @@ class PathPlanner(
                 
                 val g = current.g + 1f
                 val h = heuristic(neighbor, endGrid)
-                val f = g + h
-                
+
                 val existingNode = openList.find { it.point == neighbor }
                 if (existingNode == null) {
                     openList.add(Node(neighbor, g, h, current))
                 } else if (g < existingNode.g) {
                     existingNode.g = g
-                    existingNode.f = f
                     existingNode.parent = current
                 }
             }
@@ -126,10 +122,15 @@ class PathPlanner(
                 (prev.y + next.y) / 2f
             )
             
-            // 添加插值点
-            for (t in 0.25f..0.75f step 0.25f) {
-                val x = (1 - t) * (1 - t) * prev.x + 2 * (1 - t) * t * controlPoint.x + t * t * next.x
-                val y = (1 - t) * (1 - t) * prev.y + 2 * (1 - t) * t * controlPoint.y + t * t * next.y
+            // 添加插值点（0.25, 0.5, 0.75）
+            listOf(0.25f, 0.5f, 0.75f).forEach { t ->
+                val oneMinusT = 1 - t
+                val x = oneMinusT * oneMinusT * prev.x +
+                        2 * oneMinusT * t * controlPoint.x +
+                        t * t * next.x
+                val y = oneMinusT * oneMinusT * prev.y +
+                        2 * oneMinusT * t * controlPoint.y +
+                        t * t * next.y
                 smoothed.add(PointF(x, y))
             }
         }
