@@ -16,10 +16,14 @@ object PetEventBus {
      * 订阅事件
      */
     fun <T> subscribe(eventType: Class<T>, subscriber: (T) -> Unit): Subscription {
-        val subscription = Subscription(eventType, subscriber)
-        subscribers.getOrPut(eventType) { CopyOnWriteArrayList() }.add(
-            Subscriber(subscription, subscriber)
-        )
+        val subscription = Subscription(eventType)
+        subscribers.getOrPut(eventType) { CopyOnWriteArrayList() }
+            .add(
+                Subscriber(subscription) { anyEvent ->
+                    @Suppress("UNCHECKED_CAST")
+                    subscriber(anyEvent as T)
+                }
+            )
         return subscription
     }
 
@@ -43,12 +47,11 @@ object PetEventBus {
     /**
      * 发布事件（同步）
      */
-    fun <T> post(event: T) {
-        val eventType = event!!::class.java
+    fun post(event: Any) {
+        val eventType = event::class.java
         subscribers[eventType]?.forEach { subscriber ->
             try {
-                @Suppress("UNCHECKED_CAST")
-                subscriber.handler(event as T)
+                subscriber.handler(event)
             } catch (e: Exception) {
                 PetLogger.e("PetEventBus", "Error handling event", e)
             }
@@ -58,8 +61,8 @@ object PetEventBus {
     /**
      * 发布粘性事件
      */
-    fun <T> postSticky(event: T) {
-        val eventType = event!!::class.java
+    fun postSticky(event: Any) {
+        val eventType = event::class.java
         stickyEvents[eventType] = event
         post(event)
     }
@@ -96,7 +99,6 @@ object PetEventBus {
  * 订阅对象，用于取消订阅
  */
 data class Subscription(
-    val eventType: Class<*>,
-    val handler: (Any) -> Unit
+    val eventType: Class<*>
 )
 
