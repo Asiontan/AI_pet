@@ -40,8 +40,8 @@ class PetFloatManager(private val context: Context) {
                 PixelFormat.TRANSLUCENT
             ).apply {
                 gravity = Gravity.TOP or Gravity.START
-                x = 100
-                y = 100
+                x = 500
+                y = 1000
             }
             
             windowManager?.addView(floatView, layoutParams)
