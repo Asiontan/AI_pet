@@ -1,4 +1,4 @@
-package com.pet.pet.float.view
+package com.pet.pet.floating.view
 
 import android.content.Context
 import android.graphics.PixelFormat

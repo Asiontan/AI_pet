@@ -1,4 +1,4 @@
-package com.pet.pet.float.manager
+package com.pet.pet.floating.manager
 
 import android.content.Context
 import android.graphics.PixelFormat
@@ -6,7 +6,7 @@ import android.view.Gravity
 import android.view.WindowManager
 import com.pet.core.common.logger.PetLogger
 import com.pet.core.domain.model.PetPosition
-import com.pet.pet.float.view.PetFloatView
+import com.pet.pet.floating.view.PetFloatView
 
 /**
  * 悬浮窗管理器

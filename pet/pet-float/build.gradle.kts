@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.pet.pet.float"
+    namespace = "com.pet.pet.floating"
     compileSdk = 34
 
     defaultConfig {

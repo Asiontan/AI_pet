@@ -13,7 +13,7 @@ import androidx.core.app.NotificationCompat
 import android.R as AndroidR
 import com.pet.core.common.logger.PetLogger
 import com.pet.core.domain.model.event.UserInteractionEvent
-import com.pet.pet.float.manager.PetFloatManager
+import com.pet.pet.floating.manager.PetFloatManager
 import com.pet.pet.service.coordinator.ServiceLifecycleCoordinator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
