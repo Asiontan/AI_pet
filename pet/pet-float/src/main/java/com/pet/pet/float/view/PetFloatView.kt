@@ -12,6 +12,7 @@ import android.view.View
 import android.view.ViewConfiguration
 import android.view.WindowManager
 import com.pet.core.common.logger.PetLogger
+import com.pet.core.common.util.DensityUtils
 import com.pet.core.domain.model.PetPosition
 import com.pet.core.domain.model.event.InteractionType
 import com.pet.core.domain.model.event.UserInteractionEvent
@@ -29,7 +30,8 @@ import kotlin.math.min
 class PetFloatView(context: Context) : View(context) {
 
     private var petPosition = PetPosition()
-    private var petSize = 100f // 默认大小（像素）
+    // 默认大小：使用 dp 转 px，保证在不同分辨率下都相对合适，这里取 120dp
+    private var petSize = DensityUtils.dp2px(context, 50f).toFloat()
 
     // 绘制宠物主体的画笔
     private val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
