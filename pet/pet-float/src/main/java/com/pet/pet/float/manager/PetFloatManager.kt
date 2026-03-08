@@ -6,6 +6,7 @@ import android.view.Gravity
 import android.view.WindowManager
 import com.pet.core.common.logger.PetLogger
 import com.pet.core.domain.model.PetPosition
+import com.pet.core.domain.model.event.UserInteractionEvent
 import com.pet.pet.floating.view.PetFloatView
 
 /**
@@ -16,11 +17,20 @@ class PetFloatManager(private val context: Context) {
     private var windowManager: WindowManager? = null
     private var floatView: PetFloatView? = null
     private var isShowing = false
+    private var interactionHandler: ((UserInteractionEvent) -> Unit)? = null
     
     init {
         windowManager = context.getSystemService(Context.WINDOW_SERVICE) as? WindowManager
     }
     
+    /**
+     * 设置交互事件回调，在显示悬浮窗前/后都可以调用
+     */
+    fun setInteractionHandler(handler: ((UserInteractionEvent) -> Unit)?) {
+        interactionHandler = handler
+        floatView?.setInteractionHandler(handler)
+    }
+
     /**
      * 显示悬浮窗
      */
@@ -31,7 +41,9 @@ class PetFloatManager(private val context: Context) {
         }
         
         try {
-            floatView = PetFloatView(context)
+            floatView = PetFloatView(context).apply {
+                setInteractionHandler(interactionHandler)
+            }
             val layoutParams = WindowManager.LayoutParams(
                 WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.WRAP_CONTENT,

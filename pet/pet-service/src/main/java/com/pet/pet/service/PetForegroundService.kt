@@ -39,7 +39,12 @@ class PetForegroundService : Service() {
         
         floatManager = PetFloatManager(this)
         lifecycleCoordinator = ServiceLifecycleCoordinator(this, serviceScope)
-        
+
+        // 将悬浮宠物的交互事件转发给行为协调器
+        floatManager.setInteractionHandler { interaction: UserInteractionEvent ->
+            lifecycleCoordinator.handleUserInteraction(interaction)
+        }
+
         // 启动宠物
         serviceScope.launch {
             lifecycleCoordinator.start()
