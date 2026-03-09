@@ -18,6 +18,7 @@ class PetFloatManager(private val context: Context) {
     private var floatView: PetFloatView? = null
     private var isShowing = false
     private var interactionHandler: ((UserInteractionEvent) -> Unit)? = null
+    private var positionSettledListener: ((x: Int, y: Int) -> Unit)? = null
     
     init {
         windowManager = context.getSystemService(Context.WINDOW_SERVICE) as? WindowManager
@@ -29,6 +30,11 @@ class PetFloatManager(private val context: Context) {
     fun setInteractionHandler(handler: ((UserInteractionEvent) -> Unit)?) {
         interactionHandler = handler
         floatView?.setInteractionHandler(handler)
+    }
+
+    fun setPositionSettledListener(listener: ((x: Int, y: Int) -> Unit)?) {
+        positionSettledListener = listener
+        floatView?.setPositionSettledListener(listener)
     }
 
     /**
@@ -43,6 +49,7 @@ class PetFloatManager(private val context: Context) {
         try {
             floatView = PetFloatView(context).apply {
                 setInteractionHandler(interactionHandler)
+                setPositionSettledListener(positionSettledListener)
             }
             val layoutParams = WindowManager.LayoutParams(
                 WindowManager.LayoutParams.WRAP_CONTENT,

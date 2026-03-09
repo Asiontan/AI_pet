@@ -55,6 +55,9 @@ class PetFloatView(context: Context) : View(context) {
     // 交互事件回调，由上层（Service）注入
     private var interactionHandler: ((UserInteractionEvent) -> Unit)? = null
 
+    // 位置最终落点回调（拖拽结束/吸附完成后触发），用于持久化
+    private var positionSettledListener: ((x: Int, y: Int) -> Unit)? = null
+
     // 弹跳动画
     private val bounceAnimator: ValueAnimator = ValueAnimator.ofFloat(0f, 16f).apply {
         duration = 800L
@@ -95,6 +98,13 @@ class PetFloatView(context: Context) : View(context) {
      */
     fun setInteractionHandler(handler: ((UserInteractionEvent) -> Unit)?) {
         this.interactionHandler = handler
+    }
+
+    /**
+     * 监听悬浮窗最终位置（例如拖拽结束并吸附后）
+     */
+    fun setPositionSettledListener(listener: ((x: Int, y: Int) -> Unit)?) {
+        positionSettledListener = listener
     }
 
     /**
@@ -166,7 +176,12 @@ class PetFloatView(context: Context) : View(context) {
                         // 短按点击
                         handleClick(event, duration)
                     }
+                    // 点击/长按不改变位置，不需要吸附
+                    return true
                 }
+
+                // 发生了拖拽：结束时直接记录当前位置（不做边缘吸附）
+                positionSettledListener?.invoke(layoutParams.x, layoutParams.y)
                 return true
             }
         }
@@ -239,6 +254,7 @@ class PetFloatView(context: Context) : View(context) {
             PetLogger.e("PetFloatView", "Failed to dispatch interaction: $type", e)
         }
     }
+
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)

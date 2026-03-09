@@ -12,12 +12,17 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import android.R as AndroidR
 import com.pet.core.common.logger.PetLogger
+import com.pet.core.common.result.Result
+import com.pet.core.data.preferences.PetPreferences
+import com.pet.core.data.repository.PetRepository
+import com.pet.core.domain.model.PetPosition
 import com.pet.core.domain.model.event.UserInteractionEvent
 import com.pet.pet.floating.manager.PetFloatManager
 import com.pet.pet.service.coordinator.ServiceLifecycleCoordinator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 
 /**
@@ -29,6 +34,7 @@ class PetForegroundService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private lateinit var floatManager: PetFloatManager
     private lateinit var lifecycleCoordinator: ServiceLifecycleCoordinator
+    private lateinit var repository: PetRepository
     
     override fun onCreate() {
         super.onCreate()
@@ -39,16 +45,38 @@ class PetForegroundService : Service() {
         
         floatManager = PetFloatManager(this)
         lifecycleCoordinator = ServiceLifecycleCoordinator(this, serviceScope)
+        repository = PetRepository(PetPreferences(this))
 
         // 将悬浮宠物的交互事件转发给行为协调器
         floatManager.setInteractionHandler { interaction: UserInteractionEvent ->
             lifecycleCoordinator.handleUserInteraction(interaction)
         }
 
+        // 监听位置落点，持久化到本地
+        floatManager.setPositionSettledListener { x, y ->
+            serviceScope.launch {
+                try {
+                    repository.savePetPosition(PetPosition(x = x, y = y))
+                } catch (e: Exception) {
+                    PetLogger.e("PetForegroundService", "Failed to save pet position", e)
+                }
+            }
+        }
+
         // 启动宠物
         serviceScope.launch {
             lifecycleCoordinator.start()
             floatManager.show()
+
+            // 恢复上次位置
+            try {
+                val posResult = withContext(Dispatchers.IO) { repository.getPetPosition() }
+                if (posResult is Result.Success) {
+                    floatManager.updatePosition(posResult.data)
+                }
+            } catch (e: Exception) {
+                PetLogger.e("PetForegroundService", "Failed to restore pet position", e)
+            }
         }
     }
     
