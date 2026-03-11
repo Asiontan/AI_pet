@@ -71,9 +71,9 @@ class Live2DPetView @JvmOverloads constructor(
             lastFrameTimeNanos = 0L
             totalTimeSeconds = 0f
 
-            initCubismFrameworkIfNeeded()
-            // 保险：如果上一次没有释放干净，这里先清理一遍
+            // 先清理上一次可能残留的资源，再重新初始化 Framework
             releaseResourcesOnGlThread()
+            initCubismFrameworkIfNeeded()
             loadModelFromAssets()
             setupRenderer()
 
@@ -268,13 +268,8 @@ class Live2DPetView @JvmOverloads constructor(
     }
 
     override fun surfaceDestroyed(holder: android.view.SurfaceHolder) {
-        // GLSurfaceView 可能会在这里销毁 EGL/GL，上下文丢失前先释放纹理等资源
-        try {
-            queueEvent {
-                releaseResourcesOnGlThread()
-            }
-        } catch (_: Exception) {
-        }
+        // surfaceDestroyed 由主线程调用，此时 GL 线程仍在运行，
+        // 不在这里额外释放，资源统一由 onDetachedFromWindow 管理
         super.surfaceDestroyed(holder)
     }
 
@@ -288,18 +283,24 @@ class Live2DPetView @JvmOverloads constructor(
     }
 
     override fun onDetachedFromWindow() {
-        // 悬浮窗被移除时先暂停渲染线程，再释放资源，避免下次启动不显示
+        // 必须先在 GL 线程释放资源（GL 线程此时还活着），
+        // 再 onPause() 停止 GL 线程，顺序不能颠倒
+        try {
+            val latch = java.util.concurrent.CountDownLatch(1)
+            queueEvent {
+                releaseResourcesOnGlThread()
+                latch.countDown()
+            }
+            // 最多等 500ms，避免极端情况下卡死主线程
+            latch.await(500, java.util.concurrent.TimeUnit.MILLISECONDS)
+        } catch (_: Exception) {
+        }
+
         try {
             onPause()
         } catch (_: Exception) {
         }
 
-        try {
-            queueEvent {
-                releaseResourcesOnGlThread()
-            }
-        } catch (_: Exception) {
-        }
         super.onDetachedFromWindow()
     }
 
@@ -342,6 +343,14 @@ class Live2DPetView @JvmOverloads constructor(
 
         modelSetting = null
         eyeBlink = null
+
+        // dispose Framework，确保下次 initCubismFrameworkIfNeeded() 能从干净状态重新初始化
+        try {
+            if (CubismFramework.isInitialized()) {
+                CubismFramework.dispose()
+            }
+        } catch (_: Exception) {
+        }
     }
 }
 
