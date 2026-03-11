@@ -2,74 +2,38 @@ package com.pet.pet.floating.view
 
 import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
-import android.animation.ValueAnimator
 import android.content.Context
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
 import android.view.MotionEvent
-import android.view.View
 import android.view.ViewConfiguration
 import android.view.WindowManager
+import android.widget.FrameLayout
 import com.pet.core.common.logger.PetLogger
 import com.pet.core.common.util.DensityUtils
 import com.pet.core.domain.model.PetPosition
 import com.pet.core.domain.model.event.InteractionType
 import com.pet.core.domain.model.event.UserInteractionEvent
+import com.pet.pet.render.view.Live2DPetView
 import kotlin.math.hypot
-import kotlin.math.min
 
 /**
  * 宠物悬浮窗视图
  *
- * 这里直接绘制一个简单的“弹跳小宠物”动画：
- * - 使用圆形作为宠物身体
- * - 两个小圆点作为眼睛
- * - 通过 ValueAnimator 实现上下弹跳效果
+ * 负责拖拽、点击等交互逻辑，本身作为一个容器承载 Live2D 视图。
  */
-class PetFloatView(context: Context) : View(context) {
+class PetFloatView(context: Context) : FrameLayout(context) {
 
     private var petPosition = PetPosition()
-    // 默认大小：使用 dp 转 px，保证在不同分辨率下都相对合适，这里取 120dp
-    private var petSize = DensityUtils.dp2px(context, 50f).toFloat()
+    // 默认大小：使用 dp 转 px，这里取 50dp（你之前的设置）
+    private var petSize = DensityUtils.dp2px(context, 150f).toFloat()
 
-    // 绘制宠物主体的画笔
-    private val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#FFB74D") // 柔和一点的橙色
-        style = Paint.Style.FILL
-    }
-
-    // 眼睛
-    private val eyePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.BLACK
-        style = Paint.Style.FILL
-    }
-
-    // 弹跳偏移量（基础值），实际位移会乘以弹跳系数
-    private var bounceOffset = 0f
-    private var bounceAmplitudeFactor = 1f
-
-    // 简单“睡眠”状态，用于长按切换：睡着时颜色和弹跳幅度不同
-    private var isSleeping = false
+    // 承载 Live2D 模型的 View（具体渲染逻辑在 Live2DPetView 中）
+    private val live2dView: Live2DPetView = Live2DPetView(context)
 
     // 交互事件回调，由上层（Service）注入
     private var interactionHandler: ((UserInteractionEvent) -> Unit)? = null
 
-    // 位置最终落点回调（拖拽结束/吸附完成后触发），用于持久化
+    // 位置最终落点回调（拖拽结束后触发），用于持久化
     private var positionSettledListener: ((x: Int, y: Int) -> Unit)? = null
-
-    // 弹跳动画
-    private val bounceAnimator: ValueAnimator = ValueAnimator.ofFloat(0f, 16f).apply {
-        duration = 800L
-        repeatCount = ValueAnimator.INFINITE
-        repeatMode = ValueAnimator.REVERSE
-        addUpdateListener { animator ->
-            val base = animator.animatedValue as Float
-            bounceOffset = base * bounceAmplitudeFactor
-            invalidate()
-        }
-        start()
-    }
 
     // 拖拽 & 点击检测
     private var downRawX = 0f
@@ -82,6 +46,14 @@ class PetFloatView(context: Context) : View(context) {
         ViewConfiguration.get(context).scaledTouchSlop.toFloat()
     private val longPressTimeout: Long =
         ViewConfiguration.getLongPressTimeout().toLong()
+
+    init {
+        val size = petSize.toInt()
+        addView(
+            live2dView,
+            LayoutParams(size, size)
+        )
+    }
 
     fun setPetPosition(position: PetPosition) {
         this.petPosition = position
@@ -101,14 +73,14 @@ class PetFloatView(context: Context) : View(context) {
     }
 
     /**
-     * 监听悬浮窗最终位置（例如拖拽结束并吸附后）
+     * 监听悬浮窗最终位置（例如拖拽结束后）
      */
     fun setPositionSettledListener(listener: ((x: Int, y: Int) -> Unit)?) {
         positionSettledListener = listener
     }
 
     /**
-     * 更新悬浮窗的布局参数（位置 & 大小）
+     * 更新悬浮窗的布局参数（位置 & 大小），同时更新内部 Live2D 视图大小
      */
     private fun updateLayout() {
         val layoutParams = layoutParams as? WindowManager.LayoutParams ?: return
@@ -123,11 +95,20 @@ class PetFloatView(context: Context) : View(context) {
         } catch (e: Exception) {
             PetLogger.e("PetFloatView", "Failed to update layout", e)
         }
+
+        // 同步内部 Live2D 视图大小
+        val size = petSize.toInt()
+        live2dView.layoutParams = LayoutParams(size, size)
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         // 固定为 petSize 的正方形区域
         setMeasuredDimension(petSize.toInt(), petSize.toInt())
+        val childSize = petSize.toInt()
+        measureChildren(
+            MeasureSpec.makeMeasureSpec(childSize, MeasureSpec.EXACTLY),
+            MeasureSpec.makeMeasureSpec(childSize, MeasureSpec.EXACTLY)
+        )
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -176,11 +157,11 @@ class PetFloatView(context: Context) : View(context) {
                         // 短按点击
                         handleClick(event, duration)
                     }
-                    // 点击/长按不改变位置，不需要吸附
+                    // 点击/长按不改变位置
                     return true
                 }
 
-                // 发生了拖拽：结束时直接记录当前位置（不做边缘吸附）
+                // 发生了拖拽：结束时直接记录当前位置
                 positionSettledListener?.invoke(layoutParams.x, layoutParams.y)
                 return true
             }
@@ -219,20 +200,14 @@ class PetFloatView(context: Context) : View(context) {
 
     private fun handleClick(event: MotionEvent, duration: Long) {
         playClickAnimation()
+        // 触发 Live2D 的点击动作
+        live2dView.playTapMotion()
         dispatchInteraction(InteractionType.CLICK, event, duration)
     }
 
     private fun handleLongPress(event: MotionEvent, duration: Long) {
-        // 切换简单的“睡觉 / 清醒”状态：颜色变淡、弹跳幅度减小
-        isSleeping = !isSleeping
-        bounceAmplitudeFactor = if (isSleeping) 0.2f else 1f
-        bodyPaint.color = if (isSleeping) {
-            Color.parseColor("#90CAF9") // 偏冷色，表示睡觉
-        } else {
-            Color.parseColor("#FFB74D") // 原来的暖色
-        }
-        invalidate()
-
+        // 长按可以作为“切换状态”，这里简单触发一个 Idle 动作
+        live2dView.playIdleMotion()
         dispatchInteraction(InteractionType.LONG_PRESS, event, duration)
     }
 
@@ -254,31 +229,5 @@ class PetFloatView(context: Context) : View(context) {
             PetLogger.e("PetFloatView", "Failed to dispatch interaction: $type", e)
         }
     }
-
-
-    override fun onDraw(canvas: Canvas) {
-        super.onDraw(canvas)
-
-        if (width == 0 || height == 0) return
-
-        val cx = width / 2f
-        val cy = height / 2f + bounceOffset
-        val radius = min(width, height) / 2f * 0.9f
-
-        // 身体
-        canvas.drawCircle(cx, cy, radius, bodyPaint)
-
-        // 眼睛
-        val eyeOffsetX = radius * 0.3f
-        val eyeOffsetY = -radius * 0.2f
-        val eyeRadius = radius * 0.1f
-        canvas.drawCircle(cx - eyeOffsetX, cy + eyeOffsetY, eyeRadius, eyePaint)
-        canvas.drawCircle(cx + eyeOffsetX, cy + eyeOffsetY, eyeRadius, eyePaint)
-    }
-
-    override fun onDetachedFromWindow() {
-        super.onDetachedFromWindow()
-        // 避免内存泄漏
-        bounceAnimator.cancel()
-    }
 }
+

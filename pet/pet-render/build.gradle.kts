@@ -24,4 +24,8 @@ android {
 dependencies {
     implementation(project(":core:core-common"))
     implementation(project(":core:core-domain"))
+    implementation(project(":framework"))
+
+    // Live2D / 其他渲染相关本地库（放在 libs 目录下）
+    implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar", "*.aar"))))
 }

@@ -35,6 +35,7 @@ class PetForegroundService : Service() {
     private lateinit var floatManager: PetFloatManager
     private lateinit var lifecycleCoordinator: ServiceLifecycleCoordinator
     private lateinit var repository: PetRepository
+    private var startedOnce: Boolean = false
     
     override fun onCreate() {
         super.onCreate()
@@ -62,26 +63,13 @@ class PetForegroundService : Service() {
                 }
             }
         }
-
-        // 启动宠物
-        serviceScope.launch {
-            lifecycleCoordinator.start()
-            floatManager.show()
-
-            // 恢复上次位置
-            try {
-                val posResult = withContext(Dispatchers.IO) { repository.getPetPosition() }
-                if (posResult is Result.Success) {
-                    floatManager.updatePosition(posResult.data)
-                }
-            } catch (e: Exception) {
-                PetLogger.e("PetForegroundService", "Failed to restore pet position", e)
-            }
-        }
     }
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         PetLogger.d("PetForegroundService", "Service started")
+        // START_STICKY 场景下，系统可能会重新调用 onStartCommand 而不一定重建 Service，
+        // 因此这里做一次幂等的“确保已启动并显示”的流程，避免二次启动不显示。
+        ensureStartedAndShown()
         return START_STICKY
     }
     
@@ -90,10 +78,55 @@ class PetForegroundService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         PetLogger.d("PetForegroundService", "Service destroyed")
-        
-        serviceScope.launch {
+
+        // 尽量同步移除悬浮窗，避免残留 Surface 影响下一次启动
+        try {
             lifecycleCoordinator.stop()
+        } catch (e: Exception) {
+            PetLogger.e("PetForegroundService", "Failed to stop coordinator", e)
+        }
+
+        try {
             floatManager.hide()
+        } catch (e: Exception) {
+            PetLogger.e("PetForegroundService", "Failed to hide float view", e)
+        }
+        startedOnce = false
+    }
+
+    private fun ensureStartedAndShown() {
+        if (startedOnce) {
+            // 已经启动过了，但仍然确保悬浮窗处于显示状态
+            if (!floatManager.isShowing()) {
+                floatManager.show()
+            }
+            return
+        }
+
+        startedOnce = true
+
+        try {
+            lifecycleCoordinator.start()
+        } catch (e: Exception) {
+            PetLogger.e("PetForegroundService", "Failed to start coordinator", e)
+        }
+
+        try {
+            floatManager.show()
+        } catch (e: Exception) {
+            PetLogger.e("PetForegroundService", "Failed to show float view", e)
+        }
+
+        // 恢复上次位置
+        serviceScope.launch {
+            try {
+                val posResult = withContext(Dispatchers.IO) { repository.getPetPosition() }
+                if (posResult is Result.Success) {
+                    floatManager.updatePosition(posResult.data)
+                }
+            } catch (e: Exception) {
+                PetLogger.e("PetForegroundService", "Failed to restore pet position", e)
+            }
         }
     }
     
