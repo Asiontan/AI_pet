@@ -1,22 +1,61 @@
-*.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
-local.properties
-
-# Ignore Gradle/Android build outputs in all modules
+# ============================================================
+# Android / Gradle build outputs
+# ============================================================
 **/build/
 **/.gradle/
 
-# (Optional but common) Android Studio / IntelliJ
-**/.idea/
+# ============================================================
+# Local configuration (never commit)
+# ============================================================
+local.properties
+*.keystore
+*.jks
+
+# ============================================================
+# Android Studio / IntelliJ IDEA
+# ============================================================
+*.iml
+.idea/
+# 但保留团队共享的 run configurations
+!.idea/runConfigurations/
+
+# ============================================================
+# macOS / Windows system files
+# ============================================================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ============================================================
+# Kotlin / Java compilation artifacts
+# ============================================================
+*.class
+*.jar
+# 排除 gradle-wrapper.jar（需要提交）
+!gradle/wrapper/gradle-wrapper.jar
+
+# ============================================================
+# NDK / CMake
+# ============================================================
+.externalNativeBuild/
+.cxx/
+
+# ============================================================
+# Captures & profiling
+# ============================================================
+/captures
+
+# ============================================================
+# Generated reports
+# ============================================================
+build/reports/
+
+# ============================================================
+# Logs
+# ============================================================
+*.log
+
+# ============================================================
+# 临时脚本（不需要纳入版本管理）
+# ============================================================
+create_files.sh
