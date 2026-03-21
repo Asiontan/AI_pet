@@ -27,6 +27,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnRefresh: MaterialButton
     private lateinit var btnStart: MaterialButton
     private lateinit var btnStop: MaterialButton
+    private lateinit var btnPreviewMotion: MaterialButton
+    private lateinit var btnSwitchModel: MaterialButton
     
     private val requestOverlayPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -73,12 +75,29 @@ class MainActivity : AppCompatActivity() {
         btnRefresh = findViewById(R.id.btnRefresh)
         btnStart = findViewById(R.id.btnStart)
         btnStop = findViewById(R.id.btnStop)
+        btnPreviewMotion = findViewById(R.id.btnPreviewMotion)
+        btnSwitchModel = findViewById(R.id.btnSwitchModel)
     }
 
     private fun bindActions() {
         btnRefresh.setOnClickListener { refreshStatus() }
         btnStart.setOnClickListener { checkAndRequestPermissionsThenStartService() }
         btnStop.setOnClickListener { stopPetService() }
+        btnPreviewMotion.setOnClickListener {
+            if (com.pet.pet.service.manager.PetServiceManager.isServiceRunning(this)) {
+                AlertDialog.Builder(this)
+                    .setTitle("无法打开预览")
+                    .setMessage("桌宠服务正在运行中，请先停止服务再打开模型预览页面。")
+                    .setPositiveButton("去停止服务") { _, _ -> stopPetService() }
+                    .setNegativeButton("取消", null)
+                    .show()
+            } else {
+                startActivity(android.content.Intent(this, MotionPreviewActivity::class.java))
+            }
+        }
+        btnSwitchModel.setOnClickListener {
+            startActivity(android.content.Intent(this, ModelSwitchActivity::class.java))
+        }
     }
 
     private fun refreshStatus() {

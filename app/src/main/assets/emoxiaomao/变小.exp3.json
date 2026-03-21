@@ -1,0 +1,30 @@
+{
+    "Type": "Live2D Expression",
+    "Parameters": [
+        {
+            "Id": "ParamBodyAngleY5",
+            "Value": 10.0,
+            "Blend": "Add"
+        },
+        {
+            "Id": "ParamBodyAngleY24",
+            "Value": 0.0,
+            "Blend": "Add"
+        },
+        {
+            "Id": "ParamBodyAngleY8",
+            "Value": 10.0,
+            "Blend": "Add"
+        },
+        {
+            "Id": "ParamBodyAngleY6",
+            "Value": 6.227867126464844,
+            "Blend": "Add"
+        },
+        {
+            "Id": "ParamBodyAngleY25",
+            "Value": 10.0,
+            "Blend": "Add"
+        }
+    ]
+}

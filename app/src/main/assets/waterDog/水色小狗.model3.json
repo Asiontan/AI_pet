@@ -1,0 +1,29 @@
+{
+	"Version": 3,
+	"FileReferences": {
+		"Moc": "水色小狗.moc3",
+		"Textures": [
+			"水色小狗.8192/texture_00.png",
+			"水色小狗.8192/texture_01.png",
+			"水色小狗.8192/texture_02.png",
+			"水色小狗.8192/texture_03.png"
+		],
+		"Physics": "水色小狗.physics3.json",
+		"DisplayInfo": "水色小狗.cdi3.json"
+	},
+	"Groups": [
+		{
+			"Target": "Parameter",
+			"Name": "LipSync",
+			"Ids": []
+		},
+		{
+			"Target": "Parameter",
+			"Name": "EyeBlink",
+			"Ids": [
+				"ParamEyeLOpen",
+				"ParamEyeROpen"
+			]
+		}
+	]
+}

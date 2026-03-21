@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/motionPreviewRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#1A1A2E">
+
+    <!-- Live2D 模型预览区：占链式布局 55% 高度 -->
+    <com.pet.pet.render.view.Live2DPetView
+        android:id="@+id/live2dPreviewView"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/bottomPanel"
+        app:layout_constraintVertical_chainStyle="spread"
+        app:layout_constraintVertical_weight="55" />
+
+    <!-- 底部控制面板：最多占 45% 高度，内容可滚动 -->
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/bottomPanel"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="#16213E"
+        app:layout_constraintTop_toBottomOf="@id/live2dPreviewView"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintVertical_weight="45">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <!-- 返回按钮 + 当前动作名 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="8dp">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnBack"
+                    style="?attr/materialButtonOutlinedStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="返回"
+                    android:textColor="#E0E0E0"
+                    app:strokeColor="#0F3460" />
+
+                <TextView
+                    android:id="@+id/tvCurrentMotion"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="12dp"
+                    android:text="请选择模型"
+                    android:textColor="#E94560"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- 模型选择 Spinner -->
+            <Spinner
+                android:id="@+id/spinnerModel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:background="@drawable/badge_builtin"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="4dp" />
+
+            <!-- 无表情/动作提示 -->
+            <TextView
+                android:id="@+id/tvNoAction"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="该模型没有表情和动作文件"
+                android:textColor="#888888"
+                android:textSize="13sp"
+                android:gravity="center"
+                android:paddingVertical="8dp"
+                android:visibility="gone" />
+
+            <!-- 表情列表 -->
+            <TextView
+                android:id="@+id/tvExpHeader"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="表情"
+                android:textColor="#E94560"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="4dp"
+                android:visibility="gone" />
+
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/chipGroupExp"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                app:chipSpacingHorizontal="4dp"
+                app:singleSelection="false" />
+
+            <!-- 动作列表 -->
+            <TextView
+                android:id="@+id/tvMotHeader"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="动作"
+                android:textColor="#E94560"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="4dp"
+                android:visibility="gone" />
+
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/chipGroupMot"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:chipSpacingHorizontal="4dp"
+                app:singleSelection="true" />
+
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

@@ -30,6 +30,16 @@
             </intent-filter>
         </activity>
         
+        <activity
+            android:name=".MotionPreviewActivity"
+            android:exported="false"
+            android:label="动作预览" />
+
+        <activity
+            android:name=".ModelSwitchActivity"
+            android:exported="false"
+            android:label="切换模型" />
+
         <service
             android:name="com.pet.pet.service.PetForegroundService"
             android:enabled="true"

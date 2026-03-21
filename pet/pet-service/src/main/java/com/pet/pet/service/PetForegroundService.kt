@@ -18,6 +18,7 @@ import com.pet.core.data.repository.PetRepository
 import com.pet.core.domain.model.PetPosition
 import com.pet.core.domain.model.event.UserInteractionEvent
 import com.pet.pet.floating.manager.PetFloatManager
+import com.pet.pet.render.view.Live2DPetView
 import com.pet.pet.service.coordinator.ServiceLifecycleCoordinator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -30,30 +31,28 @@ import kotlinx.coroutines.launch
  * 整合所有模块，管理宠物生命周期
  */
 class PetForegroundService : Service() {
-    
+
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private lateinit var floatManager: PetFloatManager
     private lateinit var lifecycleCoordinator: ServiceLifecycleCoordinator
     private lateinit var repository: PetRepository
     private var startedOnce: Boolean = false
-    
+
     override fun onCreate() {
         super.onCreate()
         PetLogger.d("PetForegroundService", "Service created")
-        
+
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, createNotification())
-        
+
         floatManager = PetFloatManager(this)
         lifecycleCoordinator = ServiceLifecycleCoordinator(this, serviceScope)
         repository = PetRepository(PetPreferences(this))
 
-        // 将悬浮宠物的交互事件转发给行为协调器
         floatManager.setInteractionHandler { interaction: UserInteractionEvent ->
             lifecycleCoordinator.handleUserInteraction(interaction)
         }
 
-        // 监听位置落点，持久化到本地
         floatManager.setPositionSettledListener { x, y ->
             serviceScope.launch {
                 try {
@@ -64,31 +63,45 @@ class PetForegroundService : Service() {
             }
         }
     }
-    
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        PetLogger.d("PetForegroundService", "Service started")
-        // START_STICKY 场景下，系统可能会重新调用 onStartCommand 而不一定重建 Service，
-        // 因此这里做一次幂等的“确保已启动并显示”的流程，避免二次启动不显示。
+        PetLogger.d("PetForegroundService", "Service onStartCommand action=${intent?.action}")
         ensureStartedAndShown()
+        // 处理来自 ModelSwitchActivity 的模型/表情/动作指令
+        when (intent?.action) {
+            ACTION_SWITCH_MODEL -> {
+                val modelJsonPath = intent.getStringExtra(EXTRA_MODEL_JSON_PATH)
+                    ?: return START_STICKY
+                val isExternal = intent.getBooleanExtra(EXTRA_IS_EXTERNAL, false)
+                val source = if (isExternal)
+                    Live2DPetView.ModelSource.External(java.io.File(modelJsonPath))
+                else
+                    Live2DPetView.ModelSource.Asset(modelJsonPath)
+                floatManager.switchModel(source)
+            }
+            ACTION_PLAY_EXPRESSION -> {
+                val fileName = intent.getStringExtra(EXTRA_FILE_NAME)
+                    ?: return START_STICKY
+                floatManager.playExpression(fileName)
+            }
+            ACTION_PLAY_MOTION -> {
+                val fileName = intent.getStringExtra(EXTRA_FILE_NAME)
+                    ?: return START_STICKY
+                floatManager.playMotionFile(fileName)
+            }
+        }
         return START_STICKY
     }
-    
+
     override fun onBind(intent: Intent?): IBinder? = null
-    
+
     override fun onDestroy() {
         super.onDestroy()
         PetLogger.d("PetForegroundService", "Service destroyed")
-
-        // 尽量同步移除悬浮窗，避免残留 Surface 影响下一次启动
-        try {
-            lifecycleCoordinator.stop()
-        } catch (e: Exception) {
+        try { lifecycleCoordinator.stop() } catch (e: Exception) {
             PetLogger.e("PetForegroundService", "Failed to stop coordinator", e)
         }
-
-        try {
-            floatManager.hide()
-        } catch (e: Exception) {
+        try { floatManager.hide() } catch (e: Exception) {
             PetLogger.e("PetForegroundService", "Failed to hide float view", e)
         }
         startedOnce = false
@@ -96,65 +109,44 @@ class PetForegroundService : Service() {
 
     private fun ensureStartedAndShown() {
         if (startedOnce) {
-            // 已经启动过了，但仍然确保悬浮窗处于显示状态
-            if (!floatManager.isShowing()) {
-                floatManager.show()
-            }
+            if (!floatManager.isShowing()) floatManager.show()
             return
         }
-
         startedOnce = true
-
-        try {
-            lifecycleCoordinator.start()
-        } catch (e: Exception) {
+        try { lifecycleCoordinator.start() } catch (e: Exception) {
             PetLogger.e("PetForegroundService", "Failed to start coordinator", e)
         }
-
-        try {
-            floatManager.show()
-        } catch (e: Exception) {
+        try { floatManager.show() } catch (e: Exception) {
             PetLogger.e("PetForegroundService", "Failed to show float view", e)
         }
-
-        // 恢复上次位置
         serviceScope.launch {
             try {
                 val posResult = withContext(Dispatchers.IO) { repository.getPetPosition() }
-                if (posResult is Result.Success) {
-                    floatManager.updatePosition(posResult.data)
-                }
+                if (posResult is Result.Success) floatManager.updatePosition(posResult.data)
             } catch (e: Exception) {
                 PetLogger.e("PetForegroundService", "Failed to restore pet position", e)
             }
         }
     }
-    
+
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 "Pet Desktop Service",
                 NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Pet Desktop foreground service"
-            }
-            
-            val notificationManager = getSystemService(NotificationManager::class.java)
-            notificationManager.createNotificationChannel(channel)
+            ).apply { description = "Pet Desktop foreground service" }
+            getSystemService(NotificationManager::class.java)
+                .createNotificationChannel(channel)
         }
     }
-    
+
     private fun createNotification(): Notification {
         val intent = packageManager.getLaunchIntentForPackage(packageName)
-            ?: Intent().apply {
-                setClassName(packageName, "com.example.pet.MainActivity")
-            }
+            ?: Intent().apply { setClassName(packageName, "com.example.pet.MainActivity") }
         val pendingIntent = PendingIntent.getActivity(
-            this, 0, intent,
-            PendingIntent.FLAG_IMMUTABLE
+            this, 0, intent, PendingIntent.FLAG_IMMUTABLE
         )
-        
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Pet Desktop")
             .setContentText("宠物正在运行")
@@ -162,10 +154,45 @@ class PetForegroundService : Service() {
             .setContentIntent(pendingIntent)
             .build()
     }
-    
+
     companion object {
         private const val CHANNEL_ID = "pet_service_channel"
         private const val NOTIFICATION_ID = 1
+
+        const val ACTION_SWITCH_MODEL    = "com.pet.action.SWITCH_MODEL"
+        const val ACTION_PLAY_EXPRESSION = "com.pet.action.PLAY_EXPRESSION"
+        const val ACTION_PLAY_MOTION     = "com.pet.action.PLAY_MOTION"
+
+        const val EXTRA_MODEL_JSON_PATH  = "model_json_path"
+        const val EXTRA_IS_EXTERNAL      = "is_external"
+        const val EXTRA_FILE_NAME        = "file_name"
+
+        fun cmdSwitchModel(context: Context, modelJsonPath: String, isExternal: Boolean) {
+            context.startService(
+                Intent(context, PetForegroundService::class.java).apply {
+                    action = ACTION_SWITCH_MODEL
+                    putExtra(EXTRA_MODEL_JSON_PATH, modelJsonPath)
+                    putExtra(EXTRA_IS_EXTERNAL, isExternal)
+                }
+            )
+        }
+
+        fun cmdPlayExpression(context: Context, fileName: String) {
+            context.startService(
+                Intent(context, PetForegroundService::class.java).apply {
+                    action = ACTION_PLAY_EXPRESSION
+                    putExtra(EXTRA_FILE_NAME, fileName)
+                }
+            )
+        }
+
+        fun cmdPlayMotion(context: Context, fileName: String) {
+            context.startService(
+                Intent(context, PetForegroundService::class.java).apply {
+                    action = ACTION_PLAY_MOTION
+                    putExtra(EXTRA_FILE_NAME, fileName)
+                }
+            )
+        }
     }
 }
-

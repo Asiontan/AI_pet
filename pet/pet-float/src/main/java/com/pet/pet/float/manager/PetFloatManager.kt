@@ -109,7 +109,28 @@ class PetFloatManager(private val context: Context) {
      * 获取当前视图
      */
     fun getView(): PetFloatView? = floatView
-    
+
+    /**
+     * 切换模型
+     */
+    fun switchModel(source: com.pet.pet.render.view.Live2DPetView.ModelSource) {
+        floatView?.switchModel(source)
+    }
+
+    /**
+     * 播放 exp3 表情文件
+     */
+    fun playExpression(fileName: String) {
+        floatView?.playExpression(fileName)
+    }
+
+    /**
+     * 播放 motion3 动作文件
+     */
+    fun playMotionFile(fileName: String) {
+        floatView?.playMotionFile(fileName)
+    }
+
     /**
      * 检查是否显示
      */

@@ -1,0 +1,37 @@
+{
+	"Version": 3,
+	"FileReferences": {
+		"Moc": "豪华套餐猫猫.moc3",
+		"Textures": [
+			"豪华套餐猫猫.4096/texture_00.png",
+			"豪华套餐猫猫.4096/texture_01.png",
+			"豪华套餐猫猫.4096/texture_02.png",
+			"豪华套餐猫猫.4096/texture_03.png",
+			"豪华套餐猫猫.4096/texture_04.png",
+			"豪华套餐猫猫.4096/texture_05.png",
+			"豪华套餐猫猫.4096/texture_06.png",
+			"豪华套餐猫猫.4096/texture_07.png",
+			"豪华套餐猫猫.4096/texture_08.png",
+			"豪华套餐猫猫.4096/texture_09.png",
+			"豪华套餐猫猫.4096/texture_10.png",
+			"豪华套餐猫猫.4096/texture_11.png"
+		],
+		"Physics": "豪华套餐猫猫.physics3.json",
+		"DisplayInfo": "豪华套餐猫猫.cdi3.json"
+	},
+	"Groups": [
+		{
+			"Target": "Parameter",
+			"Name": "LipSync",
+			"Ids": []
+		},
+		{
+			"Target": "Parameter",
+			"Name": "EyeBlink",
+			"Ids": [
+				"ParamEyeLOpen",
+				"ParamEyeROpen"
+			]
+		}
+	]
+}

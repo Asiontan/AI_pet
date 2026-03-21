@@ -28,6 +28,16 @@ object PetServiceManager {
     }
     
     /**
+     * 检查服务是否正在运行
+     */
+    fun isServiceRunning(context: Context): Boolean {
+        val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+        @Suppress("DEPRECATION")
+        return manager.getRunningServices(Int.MAX_VALUE)
+            .any { it.service.className == PetForegroundService::class.java.name }
+    }
+
+    /**
      * 停止服务
      */
     fun stopService(context: Context) {

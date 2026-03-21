@@ -1,0 +1,45 @@
+{
+    "Type": "Live2D Expression",
+    "Parameters": [
+        {
+            "Id": "Param14",
+            "Value": 0.0,
+            "Blend": "Add"
+        },
+        {
+            "Id": "Param267",
+            "Value": 0.0,
+            "Blend": "Add"
+        },
+        {
+            "Id": "Param126",
+            "Value": 0.0,
+            "Blend": "Add"
+        },
+        {
+            "Id": "ParamBodyAngleY9",
+            "Value": 0.0,
+            "Blend": "Add"
+        },
+        {
+            "Id": "ParamBodyAngleY10",
+            "Value": 10.0,
+            "Blend": "Add"
+        },
+        {
+            "Id": "ParamBodyAngleY12",
+            "Value": 10.0,
+            "Blend": "Add"
+        },
+        {
+            "Id": "ParamBodyAngleY13",
+            "Value": 10.0,
+            "Blend": "Add"
+        },
+        {
+            "Id": "ParamBodyAngleY11",
+            "Value": 0.0,
+            "Blend": "Add"
+        }
+    ]
+}

@@ -90,6 +90,22 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:text="@string/ui_stop_service" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnPreviewMotion"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="预览模型动作" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSwitchModel"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="切换模型" />
     </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
