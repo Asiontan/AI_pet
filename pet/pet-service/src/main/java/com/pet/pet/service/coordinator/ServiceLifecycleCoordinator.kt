@@ -84,8 +84,32 @@ class ServiceLifecycleCoordinator(
     }
 
     /**
-     * 当情绪等级发生变化时，尝试播放对应表情。
-     * 如果当前模型没有匹配表情，则不作处理。
+     * 根据情绪等级，在当前模型的动作列表中查找匹配的动作文件名。
+     */
+    private fun findMotionForLevel(level: EmotionLevel, motions: List<String>): String? {
+        val positiveKeywords = listOf("happy", "excited", "joy", "dance", "wave", "cheer", "开心", "高兴", "欢快", "跳舞")
+        val negativeKeywords = listOf("sad", "cry", "angry", "depressed", "hurt", "难过", "伤心", "哭", "生气")
+        val neutralKeywords  = listOf("idle", "normal", "relax", "calm", "breath", "待机", "放松", "呼吸")
+        val keywords = when (level) {
+            EmotionLevel.POSITIVE -> positiveKeywords
+            EmotionLevel.NEGATIVE -> negativeKeywords
+            EmotionLevel.NEUTRAL  -> neutralKeywords
+        }
+        val nameLower = motions.map { it.removeSuffix(".motion3.json").lowercase() }
+        for (keyword in keywords) {
+            val idx = nameLower.indexOfFirst { it.contains(keyword) }
+            if (idx >= 0) return motions[idx]
+        }
+        // 中性时兜底取第一个动作（让宠物有基本反应）
+        if (level == EmotionLevel.NEUTRAL && motions.isNotEmpty()) return motions[0]
+        return null
+    }
+
+    /**
+     * 当情绪等级发生变化时，尝试播放对应表情和动作。
+     * - 表情（exp3）：精确匹配关键词
+     * - 动作（motion3）：匹配关键词，中性时兜底播放第一个动作
+     * 如果当前模型没有对应资源，则跳过该项。
      */
     private fun applyEmotionExpression(emotion: Int) {
         val newLevel = emotionToLevel(emotion)
@@ -93,21 +117,40 @@ class ServiceLifecycleCoordinator(
         lastEmotionLevel = newLevel
 
         val fm = floatManager ?: return
-        // 获取当前激活模型的表情列表
         val activeModelId = ModelManager.getActiveModelId(context)
         val modelInfo = ModelManager.findModel(context, activeModelId) ?: return
-        if (modelInfo.expressions.isEmpty()) {
-            PetLogger.d("ServiceLifecycleCoordinator", "No expressions in current model, skip emotion mapping")
-            return
+
+        // 1. 播放表情（exp3）
+        if (modelInfo.expressions.isNotEmpty()) {
+            val expFileName = findExpressionForLevel(newLevel, modelInfo.expressions)
+            if (expFileName != null) {
+                fm.playExpression(expFileName)
+                PetLogger.d("ServiceLifecycleCoordinator",
+                    "情绪$emotion($newLevel) → 表情: $expFileName")
+            } else {
+                // 积极/消极无匹配表情时清除当前表情回默认
+                if (newLevel != EmotionLevel.NEUTRAL) fm.playExpression("")
+                PetLogger.d("ServiceLifecycleCoordinator",
+                    "情绪$emotion($newLevel) → 无匹配表情，跳过")
+            }
         }
-        val expFileName = findExpressionForLevel(newLevel, modelInfo.expressions)
-        if (expFileName != null) {
-            fm.playExpression(expFileName)
+
+        // 2. 播放动作（motion3）
+        if (modelInfo.motions.isNotEmpty()) {
+            val motFileName = findMotionForLevel(newLevel, modelInfo.motions)
+            if (motFileName != null) {
+                fm.playMotionFile(motFileName)
+                PetLogger.d("ServiceLifecycleCoordinator",
+                    "情绪$emotion($newLevel) → 动作: $motFileName")
+            } else {
+                PetLogger.d("ServiceLifecycleCoordinator",
+                    "情绪$emotion($newLevel) → 无匹配动作，跳过")
+            }
+        }
+
+        if (modelInfo.expressions.isEmpty() && modelInfo.motions.isEmpty()) {
             PetLogger.d("ServiceLifecycleCoordinator",
-                "Emotion $emotion ($newLevel) -> play expression: $expFileName")
-        } else {
-            PetLogger.d("ServiceLifecycleCoordinator",
-                "Emotion $emotion ($newLevel) -> no matching expression in ${modelInfo.name}")
+                "模型 ${modelInfo.name} 无表情/动作资源，跳过情绪映射")
         }
     }
 
