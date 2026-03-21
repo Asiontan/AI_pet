@@ -1,10 +1,12 @@
 package com.example.pet
 
 import android.Manifest
+import android.app.AppOpsManager
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Process
 import android.provider.Settings
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -18,7 +20,7 @@ import com.pet.core.common.logger.PetLogger
 import com.pet.core.domain.usecase.CheckPermissionsUseCase
 
 class MainActivity : AppCompatActivity() {
-    
+
     private val checkPermissionsUseCase by lazy { CheckPermissionsUseCase(this) }
 
     private lateinit var tvPermission: android.widget.TextView
@@ -29,13 +31,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnStop: MaterialButton
     private lateinit var btnPreviewMotion: MaterialButton
     private lateinit var btnSwitchModel: MaterialButton
-    
+
     private val requestOverlayPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        refreshStatus()
-    }
-    
+    ) { _ -> refreshStatus() }
+
     private val requestNotificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
@@ -58,7 +58,6 @@ class MainActivity : AppCompatActivity() {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
-
         initViews()
         bindActions()
         refreshStatus()
@@ -68,7 +67,6 @@ class MainActivity : AppCompatActivity() {
         findViewById<MaterialToolbar>(R.id.toolbar).apply {
             title = getString(R.string.ui_title)
         }
-
         tvPermission = findViewById(R.id.tvPermission)
         tvService = findViewById(R.id.tvService)
         tvAlgo = findViewById(R.id.tvAlgo)
@@ -105,27 +103,68 @@ class MainActivity : AppCompatActivity() {
             is com.pet.core.common.result.Result.Success -> overlayResult.data
             else -> false
         }
-
         val notificationGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
                 android.content.pm.PackageManager.PERMISSION_GRANTED
         } else {
             true
         }
+        val usageStatsGranted = hasUsageStatsPermission()
 
         tvPermission.text = getString(
             R.string.ui_permission_state_fmt,
             if (overlayGranted) getString(R.string.ui_permission_granted) else getString(R.string.ui_permission_denied),
             if (notificationGranted) getString(R.string.ui_permission_granted) else getString(R.string.ui_permission_denied)
-        )
+        ) + "\n使用情况访问权限：" +
+            if (usageStatsGranted) getString(R.string.ui_permission_granted)
+            else "${getString(R.string.ui_permission_denied)}（情绪分析不可用）"
 
-        // Android限制下无法可靠读取“服务是否正在运行”，这里展示“控制台视角”的状态即可
         tvService.text = getString(R.string.ui_service_hint)
         tvAlgo.text = getString(R.string.ui_algo_placeholder)
     }
-    
+
+    /**
+     * 检查 PACKAGE_USAGE_STATS 是否已被用户授权
+     * （即使 Manifest 中已声明，也需要用户在「设置→有权查看使用情况的应用」中手动开启）
+     */
+    private fun hasUsageStatsPermission(): Boolean {
+        return try {
+            val appOps = getSystemService(APP_OPS_SERVICE) as AppOpsManager
+            val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                appOps.unsafeCheckOpNoThrow(
+                    AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), packageName
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                appOps.checkOpNoThrow(
+                    AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), packageName
+                )
+            }
+            mode == AppOpsManager.MODE_ALLOWED
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /**
+     * 弹窗引导用户前往系统设置开启使用情况访问权限
+     */
+    private fun requestUsageStatsPermission() {
+        AlertDialog.Builder(this)
+            .setTitle("需要使用情况访问权限")
+            .setMessage("情绪分析功能需要读取应用使用情况，请在下一页面中找到 \"Pet Desktop\" 并开启权限。")
+            .setPositiveButton("去开启") { _, _ ->
+                startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+            }
+            .setNegativeButton("跳过") { _, _ ->
+                // 跳过不影响服务启动，情绪分析将返回默认中性值 5
+                startPetService()
+            }
+            .show()
+    }
+
     private fun checkAndRequestPermissionsThenStartService() {
-        // 检查悬浮窗权限
+        // 1. 检查悬浮窗权限
         when (val overlayResult = checkPermissionsUseCase.checkOverlayPermission()) {
             is com.pet.core.common.result.Result.Success -> {
                 if (!overlayResult.data) {
@@ -136,23 +175,29 @@ class MainActivity : AppCompatActivity() {
             is com.pet.core.common.result.Result.Error -> {
                 PetLogger.e("MainActivity", "Failed to check overlay permission", overlayResult.exception)
             }
-
             else -> {}
         }
-        
-        // 检查通知权限（Android 13+）
+
+        // 2. 检查通知权限（Android 13+）
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != 
-                android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) !=
+                android.content.pm.PackageManager.PERMISSION_GRANTED
+            ) {
                 requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                 return
             }
         }
-        
-        // 所有权限都已授予，启动服务
+
+        // 3. 检查使用情况访问权限（非强制，跳过也可启动，情绪分析降级为中性值）
+        if (!hasUsageStatsPermission()) {
+            requestUsageStatsPermission()
+            return
+        }
+
+        // 所有权限就绪，启动服务
         startPetService()
     }
-    
+
     private fun requestOverlayPermission() {
         val intent = Intent(
             Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
@@ -160,7 +205,7 @@ class MainActivity : AppCompatActivity() {
         )
         requestOverlayPermissionLauncher.launch(intent)
     }
-    
+
     private fun startPetService() {
         PetLogger.d("MainActivity", "Starting pet service...")
         try {
@@ -184,7 +229,7 @@ class MainActivity : AppCompatActivity() {
             tvService.text = getString(R.string.ui_service_stop_failed_fmt, e.message ?: "unknown")
         }
     }
-    
+
     private fun showServiceStartingMessage(message: String = "服务已启动") {
         AlertDialog.Builder(this)
             .setTitle("Pet Desktop")
@@ -192,7 +237,7 @@ class MainActivity : AppCompatActivity() {
             .setPositiveButton("确定", null)
             .show()
     }
-    
+
     private fun showPermissionDeniedDialog(permissionName: String) {
         AlertDialog.Builder(this)
             .setTitle("权限被拒绝")

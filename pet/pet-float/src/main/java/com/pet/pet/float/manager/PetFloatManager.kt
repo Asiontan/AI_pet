@@ -135,5 +135,29 @@ class PetFloatManager(private val context: Context) {
      * 检查是否显示
      */
     fun isShowing(): Boolean = isShowing
+
+    /**
+     * 获取宠物当前位置 (x, y)，不可见时返回 null
+     */
+    fun getCurrentPosition(): Pair<Int, Int>? {
+        if (!isShowing) return null
+        val lp = floatView?.layoutParams as? WindowManager.LayoutParams ?: return null
+        return Pair(lp.x, lp.y)
+    }
+
+    /**
+     * 将宠物移动到指定坐标（用于路径规划自主移动）
+     */
+    fun movePetTo(x: Int, y: Int) {
+        val view = floatView ?: return
+        val lp = view.layoutParams as? WindowManager.LayoutParams ?: return
+        lp.x = x
+        lp.y = y
+        try {
+            windowManager?.updateViewLayout(view, lp)
+        } catch (e: Exception) {
+            PetLogger.e("PetFloatManager", "Failed to move pet", e)
+        }
+    }
 }
 

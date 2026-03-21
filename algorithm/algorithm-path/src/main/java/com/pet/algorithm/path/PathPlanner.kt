@@ -10,8 +10,8 @@ import kotlin.math.abs
  * 用于宠物在桌面上的避障移动
  */
 class PathPlanner(
-    private val screenWidth: Int,
-    private val screenHeight: Int,
+    val screenWidth: Int,
+    val screenHeight: Int,
     private val gridSize: Int = 20 // 网格大小（像素）
 ) {
     private var grid: Array<BooleanArray> = Array(0) { BooleanArray(0) }

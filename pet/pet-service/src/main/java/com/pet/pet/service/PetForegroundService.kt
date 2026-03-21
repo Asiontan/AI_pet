@@ -47,6 +47,7 @@ class PetForegroundService : Service() {
 
         floatManager = PetFloatManager(this)
         lifecycleCoordinator = ServiceLifecycleCoordinator(this, serviceScope)
+        lifecycleCoordinator.floatManager = floatManager
         repository = PetRepository(PetPreferences(this))
 
         floatManager.setInteractionHandler { interaction: UserInteractionEvent ->

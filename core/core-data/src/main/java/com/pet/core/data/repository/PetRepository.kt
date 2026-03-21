@@ -11,6 +11,7 @@ import kotlinx.coroutines.withContext
 class PetRepository(
     private val preferences: PetPreferences
 ) : IPetRepository {
+
     override suspend fun getPetState(): Result<PetState> = withContext(Dispatchers.IO) {
         try {
             val state = PetState(
@@ -52,6 +53,48 @@ class PetRepository(
             preferences.savePetX(position.x)
             preferences.savePetY(position.y)
             Result.Success(Unit)
+        } catch (e: Exception) {
+            Result.Error(e)
+        }
+    }
+
+    // ── 情绪值持久化 ──────────────────────────────────────────────────
+    /** 保存宠物情绪值 */
+    suspend fun savePetEmotion(emotion: Int): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            preferences.savePetEmotion(emotion)
+            Result.Success(Unit)
+        } catch (e: Exception) {
+            Result.Error(e)
+        }
+    }
+
+    /** 读取宠物情绪值 */
+    suspend fun getPetEmotion(): Result<Int> = withContext(Dispatchers.IO) {
+        try {
+            Result.Success(preferences.getPetEmotion())
+        } catch (e: Exception) {
+            Result.Error(e)
+        }
+    }
+
+    // ── 交互统计持久化 ────────────────────────────────────────────────
+    /** 记录一次点击，累加今日计数 */
+    suspend fun recordClick(): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val count = preferences.getTodayClickCount() + 1
+            preferences.saveTodayClickCount(count)
+            preferences.saveLastInteractionTime(System.currentTimeMillis())
+            Result.Success(Unit)
+        } catch (e: Exception) {
+            Result.Error(e)
+        }
+    }
+
+    /** 读取今日点击次数 */
+    suspend fun getTodayClickCount(): Result<Int> = withContext(Dispatchers.IO) {
+        try {
+            Result.Success(preferences.getTodayClickCount())
         } catch (e: Exception) {
             Result.Error(e)
         }

@@ -31,6 +31,10 @@ class PetFloatView(context: Context) : FrameLayout(context) {
     private var lastRawY = 0f
     private var downTime = 0L
 
+    // 双击检测
+    private var lastClickTime = 0L
+    private val doubleClickTimeout: Long = 350L
+
     private val clickSlop: Float = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
     private val longPressTimeout: Long = ViewConfiguration.getLongPressTimeout().toLong()
 
@@ -170,8 +174,17 @@ class PetFloatView(context: Context) : FrameLayout(context) {
     }
 
     private fun handleClick(event: MotionEvent, duration: Long) {
-        playClickAnimation()
-        dispatchInteraction(InteractionType.CLICK, event, duration)
+        val now = System.currentTimeMillis()
+        if (now - lastClickTime < doubleClickTimeout) {
+            // 双击
+            lastClickTime = 0L
+            playClickAnimation()
+            dispatchInteraction(InteractionType.DOUBLE_CLICK, event, duration)
+        } else {
+            lastClickTime = now
+            playClickAnimation()
+            dispatchInteraction(InteractionType.CLICK, event, duration)
+        }
     }
 
     private fun handleLongPress(event: MotionEvent, duration: Long) {
