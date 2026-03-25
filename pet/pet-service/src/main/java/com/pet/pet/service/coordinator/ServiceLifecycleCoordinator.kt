@@ -15,6 +15,7 @@ import com.pet.core.data.preferences.PetPreferences
 import com.pet.core.domain.model.event.UserInteractionEvent
 import com.pet.pet.behavior.statemachine.PetBehaviorStateMachine
 import com.pet.pet.floating.manager.PetFloatManager
+import com.pet.pet.service.chat.ChatManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -46,6 +47,9 @@ class ServiceLifecycleCoordinator(
 
     // 悬浮窗管理器引用（由 PetForegroundService 注入）
     var floatManager: PetFloatManager? = null
+
+    // 聊天管理器引用（由 PetForegroundService 注入）
+    var chatManager: ChatManager? = null
 
     private var isRunning = false
 
@@ -210,6 +214,18 @@ class ServiceLifecycleCoordinator(
             PetLogger.d("ServiceLifecycleCoordinator", "Saved emotion=${rlBehaviorManager.getCurrentEmotion()}")
         }
         PetLogger.d("ServiceLifecycleCoordinator", "Coordinator stopped")
+    }
+
+    /**
+     * 对话情绪联动：聊天回复完成后由 PetForegroundService 调用
+     * 强制刷新情绪等级（忽略等级相同的防抖逻辑）
+     */
+    fun applyEmotionFromChat(emotionScore: Int) {
+        lastEmotionLevel = EmotionLevel.NEUTRAL // 重置，确保一定触发
+        applyEmotionExpression(emotionScore)
+        if (::rlBehaviorManager.isInitialized) {
+            rlBehaviorManager.updateEmotion(emotionScore)
+        }
     }
 
     /**

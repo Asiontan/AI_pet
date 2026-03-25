@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/llRoot"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:padding="4dp">
+
+    <!-- 宠物头像（仅宠物消息显示） -->
+    <TextView
+        android:id="@+id/tvAvatar"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:layout_marginEnd="6dp"
+        android:layout_marginTop="2dp"
+        android:background="@drawable/bg_avatar"
+        android:gravity="center"
+        android:text="🐾"
+        android:textSize="16sp"
+        android:visibility="gone" />
+
+    <!-- 消息气泡 -->
+    <TextView
+        android:id="@+id/tvMessage"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical"
+        android:maxWidth="240dp"
+        android:paddingHorizontal="14dp"
+        android:paddingVertical="10dp"
+        android:textColor="#E8D5C4"
+        android:textSize="15sp"
+        android:lineSpacingExtra="2dp" />
+
+</LinearLayout>
+

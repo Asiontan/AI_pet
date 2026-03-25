@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -13,6 +15,15 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0.0"
+
+        // 从 local.properties 读取 DeepSeek API Key，注入 BuildConfig（仅用于测试）
+        val localProps = Properties().also { props ->
+            val f = rootProject.file("local.properties")
+            if (f.exists()) props.load(f.inputStream())
+        }
+        buildConfigField("String", "DEEPSEEK_API_KEY",
+            "\"${localProps.getProperty("DEEPSEEK_API_KEY", "")}\""
+        )
     }
 
     buildTypes {

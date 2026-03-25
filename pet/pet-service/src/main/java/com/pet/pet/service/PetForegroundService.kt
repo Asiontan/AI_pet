@@ -19,6 +19,7 @@ import com.pet.core.domain.model.PetPosition
 import com.pet.core.domain.model.event.UserInteractionEvent
 import com.pet.pet.floating.manager.PetFloatManager
 import com.pet.pet.render.view.Live2DPetView
+import com.pet.pet.service.chat.ChatManager
 import com.pet.pet.service.coordinator.ServiceLifecycleCoordinator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,6 +37,7 @@ class PetForegroundService : Service() {
     private lateinit var floatManager: PetFloatManager
     private lateinit var lifecycleCoordinator: ServiceLifecycleCoordinator
     private lateinit var repository: PetRepository
+    private lateinit var chatManager: ChatManager
     private var startedOnce: Boolean = false
 
     override fun onCreate() {
@@ -49,9 +51,17 @@ class PetForegroundService : Service() {
         lifecycleCoordinator = ServiceLifecycleCoordinator(this, serviceScope)
         lifecycleCoordinator.floatManager = floatManager
         repository = PetRepository(PetPreferences(this))
+        // 复用 Application 单例，与 ChatDialogActivity 共享同一个 ChatManager（历史记录一致）
+        chatManager = ChatManager(this)
+        lifecycleCoordinator.chatManager = chatManager
 
         floatManager.setInteractionHandler { interaction: UserInteractionEvent ->
+            if (interaction.type == com.pet.core.domain.model.event.InteractionType.LONG_PRESS) {
+                // 长按宠物打开聊天界面
+                openChatDialog()
+            } else {
             lifecycleCoordinator.handleUserInteraction(interaction)
+            }
         }
 
         floatManager.setPositionSettledListener { x, y ->
@@ -90,8 +100,25 @@ class PetForegroundService : Service() {
                     ?: return START_STICKY
                 floatManager.playMotionFile(fileName)
             }
+            ACTION_OPEN_CHAT -> openChatDialog()
+            ACTION_APPLY_EMOTION -> {
+                val score = intent.getIntExtra(EXTRA_EMOTION_SCORE, 5)
+                lifecycleCoordinator.applyEmotionFromChat(score)
+            }
         }
         return START_STICKY
+    }
+
+    private fun openChatDialog() {
+        try {
+            val intent = Intent().apply {
+                setClassName(packageName, "com.example.pet.chat.ChatDialogActivity")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(intent)
+        } catch (e: Exception) {
+            PetLogger.e("PetForegroundService", "Failed to open chat dialog", e)
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -163,10 +190,13 @@ class PetForegroundService : Service() {
         const val ACTION_SWITCH_MODEL    = "com.pet.action.SWITCH_MODEL"
         const val ACTION_PLAY_EXPRESSION = "com.pet.action.PLAY_EXPRESSION"
         const val ACTION_PLAY_MOTION     = "com.pet.action.PLAY_MOTION"
+        const val ACTION_OPEN_CHAT       = "com.pet.action.OPEN_CHAT"
+        const val ACTION_APPLY_EMOTION   = "com.pet.action.APPLY_EMOTION"
 
         const val EXTRA_MODEL_JSON_PATH  = "model_json_path"
         const val EXTRA_IS_EXTERNAL      = "is_external"
         const val EXTRA_FILE_NAME        = "file_name"
+        const val EXTRA_EMOTION_SCORE    = "emotion_score"
 
         fun cmdSwitchModel(context: Context, modelJsonPath: String, isExternal: Boolean) {
             context.startService(

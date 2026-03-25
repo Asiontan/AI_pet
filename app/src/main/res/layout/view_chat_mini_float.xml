@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/layoutMiniRoot"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:background="@drawable/bg_mini_float"
+    android:paddingHorizontal="12dp"
+    android:paddingVertical="6dp">
+
+    <!-- 展开按钮 -->
+    <ImageButton
+        android:id="@+id/btnMiniExpand"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:layout_marginEnd="6dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="展开聊天"
+        android:src="@android:drawable/arrow_up_float"
+        android:tint="#A78BFA" />
+
+    <EditText
+        android:id="@+id/etMiniInput"
+        android:layout_width="180dp"
+        android:layout_height="wrap_content"
+        android:background="@android:color/transparent"
+        android:hint="说点什么..."
+        android:imeOptions="actionSend"
+        android:inputType="text"
+        android:maxLines="1"
+        android:paddingHorizontal="4dp"
+        android:paddingVertical="6dp"
+        android:textColor="#E8D5C4"
+        android:textSize="14sp" />
+
+    <ImageButton
+        android:id="@+id/btnMiniSend"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_marginStart="6dp"
+        android:background="@drawable/bg_send_button"
+        android:contentDescription="发送"
+        android:src="@android:drawable/ic_menu_send"
+        android:tint="#FFFFFF" />
+
+    <ImageButton
+        android:id="@+id/btnMiniClose"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:layout_marginStart="4dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="关闭"
+        android:src="@android:drawable/ic_menu_close_clear_cancel"
+        android:tint="#9E9E9E" />
+
+</LinearLayout>
+

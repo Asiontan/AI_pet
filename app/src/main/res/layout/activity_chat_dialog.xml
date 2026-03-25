@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/rootLayout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#CC000000">
+
+    <androidx.cardview.widget.CardView
+        android:id="@+id/cardChat"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginHorizontal="20dp"
+        android:layout_marginVertical="60dp"
+        app:cardBackgroundColor="#1A1A2E"
+        app:cardCornerRadius="24dp"
+        app:cardElevation="16dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <!-- 顶栏 -->
+            <LinearLayout
+                android:id="@+id/layoutHeader"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:background="#16213E"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="16dp"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="和宠物聊天"
+                    android:textColor="#E8D5C4"
+                    android:textSize="17sp" />
+
+                <!-- 缩小按钮 -->
+                <ImageButton
+                    android:id="@+id/btnMinimize"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:layout_marginEnd="4dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="缩小"
+                    android:src="@android:drawable/arrow_down_float"
+                    android:tint="#9E9E9E" />
+
+                <ImageButton
+                    android:id="@+id/btnSettings"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:layout_marginEnd="4dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="设置"
+                    android:src="@android:drawable/ic_menu_preferences"
+                    android:tint="#9E9E9E" />
+
+                <ImageButton
+                    android:id="@+id/btnClose"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="关闭"
+                    android:src="@android:drawable/ic_menu_close_clear_cancel"
+                    android:tint="#9E9E9E" />
+            </LinearLayout>
+
+            <!-- 消息列表 -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvMessages"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:clipToPadding="false"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="8dp"
+                android:scrollbars="none"
+                app:layout_constraintBottom_toTopOf="@id/layoutInput"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/layoutHeader" />
+
+            <!-- 输入区域 -->
+            <LinearLayout
+                android:id="@+id/layoutInput"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:background="#16213E"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="8dp"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent">
+
+                <EditText
+                    android:id="@+id/etInput"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_input_field"
+                    android:hint="说点什么..."
+                    android:imeOptions="actionSend"
+                    android:inputType="textMultiLine|textCapSentences"
+                    android:maxLines="4"
+                    android:paddingHorizontal="14dp"
+                    android:paddingVertical="10dp"
+                    android:textColor="#E8D5C4"
+                    android:textSize="15sp" />
+
+                <ImageButton
+                    android:id="@+id/btnSend"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/bg_send_button"
+                    android:contentDescription="发送"
+                    android:src="@android:drawable/ic_menu_send"
+                    android:tint="#FFFFFF" />
+            </LinearLayout>
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+    </androidx.cardview.widget.CardView>
+
+</androidx.constraintlayout.widget.ConstraintLayout>
