@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/bubbleRoot"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:gravity="center_horizontal">
+
+    <!-- 气泡主体 -->
+    <FrameLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_pet_bubble"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="12dp">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:maxWidth="260dp">
+
+            <TextView
+                android:id="@+id/tvBubble"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:maxWidth="240dp"
+                android:textColor="#2D1B4E"
+                android:textSize="14sp"
+                android:lineSpacingExtra="3dp"
+                android:letterSpacing="0.02"
+                android:fontFamily="sans-serif" />
+
+            <!-- 打字机光标（流式输出时闪烁） -->
+            <View
+                android:id="@+id/viewCursor"
+                android:layout_width="2dp"
+                android:layout_height="16dp"
+                android:layout_marginStart="2dp"
+                android:background="#7C4DFF"
+                android:visibility="gone" />
+
+        </LinearLayout>
+    </FrameLayout>
+
+    <!-- 气泡尾巴三角 -->
+    <View
+        android:layout_width="14dp"
+        android:layout_height="9dp"
+        android:background="@drawable/bg_bubble_tail" />
+
+</LinearLayout>

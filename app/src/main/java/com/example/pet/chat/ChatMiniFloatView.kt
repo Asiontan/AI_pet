@@ -44,18 +44,21 @@ class ChatMiniFloatView(private val context: Context) {
 
         etInput.setHintTextColor(0x88555577.toInt())
 
-        // 展开 → 隐藏自己，打开完整聊天界面
+        // 展开 → 隐藏自己（同步更新 ChatMiniService 标志位），打开完整聊天界面
         btnExpand.setOnClickListener {
             hide()
+            // 同步清除 Mini 服务的 isShowing 标志，避免全屏打开时误判
+            com.example.pet.chat.ChatMiniService.hide(context)
             openFullChat()
         }
 
-        // 发送消息：先展开完整界面，再发送，确保回复可见
+        // 发送消息：静默发送，回复以气泡形式显示在宠物头顶
         btnSend.setOnClickListener {
             val text = etInput.text.toString().trim()
             if (text.isNotBlank()) {
-                hide()
-                openFullChat(text)
+                chatManager.sendMessage(text, System.currentTimeMillis())
+                etInput.setText("")
+                hideKeyboard(etInput)
             }
         }
 
@@ -67,7 +70,10 @@ class ChatMiniFloatView(private val context: Context) {
         }
 
         // 关闭
-        btnClose.setOnClickListener { hide() }
+        btnClose.setOnClickListener {
+            hide()
+            com.example.pet.chat.ChatMiniService.hide(context)
+        }
 
         val lp = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,

@@ -13,6 +13,9 @@ import com.pet.core.domain.model.PetPosition
 import com.pet.core.domain.model.event.InteractionType
 import com.pet.core.domain.model.event.UserInteractionEvent
 import com.pet.pet.render.view.Live2DPetView
+import com.pet.pet.floating.view.HeartParticleView
+import android.animation.ValueAnimator
+import android.util.DisplayMetrics
 import kotlin.math.hypot
 
 class PetFloatView(context: Context) : FrameLayout(context) {
@@ -24,6 +27,8 @@ class PetFloatView(context: Context) : FrameLayout(context) {
 
     private var interactionHandler: ((UserInteractionEvent) -> Unit)? = null
     private var positionSettledListener: ((x: Int, y: Int) -> Unit)? = null
+    // 拖动中实时回调，用于气泡跟随
+    var onPositionChangedListener: ((x: Int, y: Int) -> Unit)? = null
 
     private var downRawX = 0f
     private var downRawY = 0f
@@ -133,6 +138,8 @@ class PetFloatView(context: Context) : FrameLayout(context) {
                     PetLogger.e("PetFloatView", "Failed to drag update layout", e)
                 }
                 lastRawX = event.rawX; lastRawY = event.rawY
+                // 实时通知气泡跟随
+                onPositionChangedListener?.invoke(lp.x, lp.y)
                 return true
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
@@ -143,7 +150,8 @@ class PetFloatView(context: Context) : FrameLayout(context) {
                     else handleClick(event, duration)
                     return true
                 }
-                positionSettledListener?.invoke(lp.x, lp.y)
+                // 拖动松手后平滑吸附到最近屏幕边缘
+                snapToNearestEdge(lp)
                 return true
             }
         }
@@ -176,9 +184,13 @@ class PetFloatView(context: Context) : FrameLayout(context) {
     private fun handleClick(event: MotionEvent, duration: Long) {
         val now = System.currentTimeMillis()
         if (now - lastClickTime < doubleClickTimeout) {
-            // 双击
+            // 双击：播放爱心粒子特效
             lastClickTime = 0L
             playClickAnimation()
+            val lp = layoutParams as? WindowManager.LayoutParams
+            if (lp != null) {
+                HeartParticleView.playAt(context, lp.x, lp.y, lp.width.takeIf { it > 0 } ?: petSize.toInt())
+            }
             dispatchInteraction(InteractionType.DOUBLE_CLICK, event, duration)
         } else {
             lastClickTime = now
@@ -209,4 +221,41 @@ class PetFloatView(context: Context) : FrameLayout(context) {
     fun switchModel(source: Live2DPetView.ModelSource) { live2dView.switchModel(source) }
     fun playExpression(fileName: String) { live2dView.playExpression(fileName) }
     fun playMotionFile(fileName: String) { live2dView.playMotionFile(fileName) }
+
+    /**
+     * 松手后平滑吸附到最近屏幕左/右边缘（弹簧缓动）
+     */
+    private fun snapToNearestEdge(lp: WindowManager.LayoutParams) {
+        val wm = context.getSystemService(Context.WINDOW_SERVICE) as? WindowManager ?: return
+        val dm = DisplayMetrics()
+        try {
+            @Suppress("DEPRECATION")
+            wm.defaultDisplay.getRealMetrics(dm)
+        } catch (_: Exception) { return }
+        val screenW = dm.widthPixels
+        val petW    = lp.width.takeIf { it > 0 } ?: petSize.toInt()
+        val margin  = 0  // 吸附到边缘，无额外边距
+        val targetX = if (lp.x + petW / 2 < screenW / 2) margin
+                      else screenW - petW - margin
+        val startX  = lp.x
+        if (startX == targetX) {
+            positionSettledListener?.invoke(lp.x, lp.y)
+            return
+        }
+        ValueAnimator.ofInt(startX, targetX).apply {
+            duration = 280L
+            interpolator = android.view.animation.DecelerateInterpolator(2f)
+            addUpdateListener { anim ->
+                lp.x = anim.animatedValue as Int
+                try { wm.updateViewLayout(this@PetFloatView, lp) } catch (_: Exception) {}
+                onPositionChangedListener?.invoke(lp.x, lp.y)
+            }
+            addListener(object : android.animation.AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: android.animation.Animator) {
+                    positionSettledListener?.invoke(lp.x, lp.y)
+                }
+            })
+            start()
+        }
+    }
 }

@@ -1,111 +1,436 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.core.widget.NestedScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="16dp"
+    android:background="#0F0F1A"
     tools:context=".MainActivity">
 
-    <com.google.android.material.appbar.MaterialToolbar
-        android:id="@+id/toolbar"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:title="@string/ui_title"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
-
-    <com.google.android.material.card.MaterialCardView
-        android:id="@+id/cardStatus"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        app:cardElevation="0dp"
-        app:strokeWidth="1dp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/toolbar">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="16dp">
-
-            <TextView
-                android:id="@+id/tvPermission"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/ui_permission_unknown"
-                android:textAppearance="?attr/textAppearanceBodyLarge" />
-
-            <TextView
-                android:id="@+id/tvService"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="@string/ui_service_unknown"
-                android:textAppearance="?attr/textAppearanceBodyLarge" />
-
-            <TextView
-                android:id="@+id/tvAlgo"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="@string/ui_algo_placeholder"
-                android:textAppearance="?attr/textAppearanceBodyMedium" />
-        </LinearLayout>
-    </com.google.android.material.card.MaterialCardView>
-
     <LinearLayout
-        android:id="@+id/actions"
-        android:layout_width="0dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
         android:orientation="vertical"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/cardStatus">
+        android:padding="16dp">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnRefresh"
-            style="?attr/materialButtonOutlinedStyle"
+        <!-- 标题栏 -->
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/ui_refresh" />
+            android:title="@string/ui_title"
+            app:titleTextColor="#E8D5C4"
+            android:background="@android:color/transparent" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnStart"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/ui_start_service" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnStop"
-            style="?attr/materialButtonOutlinedStyle"
+        <!-- 宠物状态卡片 -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardPetStats"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="@string/ui_stop_service" />
+            app:cardBackgroundColor="#1A1A2E"
+            app:cardElevation="4dp"
+            app:cardCornerRadius="16dp"
+            app:strokeColor="#3A3A6A"
+            app:strokeWidth="1dp">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnPreviewMotion"
-            style="?attr/materialButtonOutlinedStyle"
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="✦ 宠物状态"
+                    android:textColor="#BBA0FF"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.08" />
+
+                <!-- 情绪 + 亲密度 横排 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="12dp">
+
+                    <!-- 情绪值 -->
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:background="#12FFFFFF"
+                        android:padding="12dp">
+
+                        <TextView
+                            android:id="@+id/tvEmotionEmoji"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="😊"
+                            android:textSize="28sp" />
+
+                        <TextView
+                            android:id="@+id/tvEmotionValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="情绪: --"
+                            android:textColor="#E8D5C4"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="8dp"
+                        android:layout_height="1dp" />
+
+                    <!-- 亲密度 -->
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:background="#12FFFFFF"
+                        android:padding="12dp">
+
+                        <TextView
+                            android:id="@+id/tvBondEmoji"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="🤍"
+                            android:textSize="28sp" />
+
+                        <TextView
+                            android:id="@+id/tvBondValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="亲密度: --"
+                            android:textColor="#E8D5C4"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="8dp"
+                        android:layout_height="1dp" />
+
+                    <!-- 在线时长 -->
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:background="#12FFFFFF"
+                        android:padding="12dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="⏱"
+                            android:textSize="28sp" />
+
+                        <TextView
+                            android:id="@+id/tvOnlineTime"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="在线: --"
+                            android:textColor="#E8D5C4"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="8dp"
+                        android:layout_height="1dp" />
+
+                    <!-- 聊天次数 -->
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:background="#12FFFFFF"
+                        android:padding="12dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="💬"
+                            android:textSize="28sp" />
+
+                        <TextView
+                            android:id="@+id/tvChatCount"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="聊天: --"
+                            android:textColor="#E8D5C4"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                </LinearLayout>
+
+                <!-- 亲密度进度条 -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="亲密度进度"
+                    android:textColor="#88AAAACC"
+                    android:textSize="11sp" />
+
+                <ProgressBar
+                    android:id="@+id/progressBond"
+                    style="?android:attr/progressBarStyleHorizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="8dp"
+                    android:layout_marginTop="4dp"
+                    android:max="100"
+                    android:progress="0"
+                    android:progressTint="#BBA0FF"
+                    android:progressBackgroundTint="#2A2A4A" />
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- 权限 & 服务状态卡片 -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardStatus"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="预览模型动作" />
+            android:layout_marginTop="12dp"
+            app:cardBackgroundColor="#1A1A2E"
+            app:cardElevation="4dp"
+            app:cardCornerRadius="16dp"
+            app:strokeColor="#3A3A6A"
+            app:strokeWidth="1dp">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnSwitchModel"
-            style="?attr/materialButtonOutlinedStyle"
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="✦ 系统状态"
+                    android:textColor="#BBA0FF"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.08" />
+
+                <TextView
+                    android:id="@+id/tvPermission"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="@string/ui_permission_unknown"
+                    android:textColor="#CCE8D5C4"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/tvService"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="@string/ui_service_unknown"
+                    android:textColor="#CCE8D5C4"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/tvAlgo"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="@string/ui_algo_placeholder"
+                    android:textColor="#88AAAACC"
+                    android:textSize="12sp" />
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- 操作按钮区 -->
+        <LinearLayout
+            android:id="@+id/actions"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="切换模型" />
+            android:layout_marginTop="12dp"
+            android:orientation="vertical">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnRefresh"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/ui_refresh" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnStart"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/ui_start_service" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnStop"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/ui_stop_service" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnPreviewMotion"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="预览模型动作" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnSwitchModel"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="切换模型" />
+
+        </LinearLayout>
+
+        <!-- 手势识别开关卡片 -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardGesture"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            app:cardBackgroundColor="#1A1A2E"
+            app:cardElevation="4dp"
+            app:cardCornerRadius="16dp"
+            app:strokeColor="#3A3A6A"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="✦ 手势识别"
+                    android:textColor="#BBA0FF"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.08" />
+
+                <!-- 说明文字 -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="使用前置摄像头识别手势，实时与桌宠互动"
+                    android:textColor="#88AAAACC"
+                    android:textSize="12sp" />
+
+                <!-- 手势对照表 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="10dp"
+                    android:gravity="center">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:text="👍
+点赞=开心"
+                        android:textColor="#CCE8D5C4"
+                        android:textSize="11sp" />
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="✌️
+比耶=愉快"
+                        android:textColor="#CCE8D5C4"
+                        android:textSize="11sp"
+                        android:gravity="center" />
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="🖐
+挥手=特效"
+                        android:textColor="#CCE8D5C4"
+                        android:textSize="11sp"
+                        android:gravity="center" />
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="☝️
+指向=聊天"
+                        android:textColor="#CCE8D5C4"
+                        android:textSize="11sp"
+                        android:gravity="center" />
+
+                </LinearLayout>
+
+                <!-- 状态文字 -->
+                <TextView
+                    android:id="@+id/tvGestureStatus"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="状态：未开启"
+                    android:textColor="#88AAAACC"
+                    android:textSize="12sp" />
+
+                <!-- 开关行 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="10dp"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="启用手势识别"
+                        android:textColor="#E8D5C4"
+                        android:textSize="14sp" />
+
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/switchGesture"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:checked="false"
+                        app:thumbTint="#BBA0FF"
+                        app:trackTint="#3A3A6A" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
     </LinearLayout>
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+</androidx.core.widget.NestedScrollView>

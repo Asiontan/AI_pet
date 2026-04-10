@@ -45,6 +45,11 @@ class ChatDialogActivity : AppCompatActivity() {
 
     private val chatReceiver = object : BroadcastReceiver() {
         override fun onReceive(ctx: Context, intent: Intent) {
+            // 服务停止时关闭自身
+            if (intent.action == com.example.pet.OpenChatReceiver.ACTION_FINISH_CHAT_ACTIVITY) {
+                finish()
+                return
+            }
             val msgId = intent.getLongExtra(ChatManager.EXTRA_MSG_ID, -1L)
             when (intent.action) {
                 ChatManager.ACTION_CHAT_TOKEN -> {
@@ -208,6 +213,7 @@ class ChatDialogActivity : AppCompatActivity() {
             addAction(ChatManager.ACTION_CHAT_TOKEN)
             addAction(ChatManager.ACTION_CHAT_DONE)
             addAction(ChatManager.ACTION_CHAT_ERROR)
+            addAction(com.example.pet.OpenChatReceiver.ACTION_FINISH_CHAT_ACTIVITY)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(chatReceiver, filter, RECEIVER_NOT_EXPORTED)
@@ -218,6 +224,25 @@ class ChatDialogActivity : AppCompatActivity() {
     }
 
     private fun showApiKeyDialog() {
+        // 两个选项：配置 API Key / 自定义人设
+        val options = arrayOf("🔑  配置 API Key", "🐾  自定义宠物人设", "🔄  重置人设为默认")
+        AlertDialog.Builder(this)
+            .setTitle("设置")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> showApiKeyInputDialog()
+                    1 -> showSystemPromptDialog()
+                    2 -> {
+                        chatManager.resetSystemPrompt()
+                        Toast.makeText(this, "人设已重置为默认", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+            .setNegativeButton("关闭", null)
+            .show()
+    }
+
+    private fun showApiKeyInputDialog() {
         val editText = EditText(this).apply {
             hint = "sk-xxxxxxxxxxxxxxxx"
             setText(chatManager.getApiKey())
@@ -241,6 +266,33 @@ class ChatDialogActivity : AppCompatActivity() {
                 } else {
                     Toast.makeText(this, "API Key 不能为空", Toast.LENGTH_SHORT).show()
                 }
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun showSystemPromptDialog() {
+        val current = chatManager.getSystemPrompt()
+        val editText = EditText(this).apply {
+            hint = "描述宠物的性格、说话风格..."
+            setText(current)
+            setTextColor(0xFFE8D5C4.toInt())
+            setHintTextColor(0x88AAAAAA.toInt())
+            setPadding(48, 32, 48, 32)
+            minLines = 4
+            maxLines = 8
+            isSingleLine = false
+            gravity = android.view.Gravity.TOP
+        }
+        AlertDialog.Builder(this)
+            .setTitle("自定义宠物人设")
+            .setMessage("自定义系统提示词，决定宠物的性格和说话风格。留空则使用默认人设。")
+            .setView(editText)
+            .setPositiveButton("保存") { _, _ ->
+                val prompt = editText.text.toString().trim()
+                chatManager.saveSystemPrompt(prompt)
+                val hint = if (prompt.isBlank()) "人设已重置为默认~" else "新人设已保存！下次对话生效 ✓"
+                Toast.makeText(this, hint, Toast.LENGTH_SHORT).show()
             }
             .setNegativeButton("取消", null)
             .show()

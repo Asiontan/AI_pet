@@ -10,6 +10,8 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ServiceLifecycleDispatcher
 import android.R as AndroidR
 import com.pet.core.common.logger.PetLogger
 import com.pet.core.common.result.Result
@@ -31,7 +33,10 @@ import kotlinx.coroutines.launch
  * 宠物前台服务
  * 整合所有模块，管理宠物生命周期
  */
-class PetForegroundService : Service() {
+class PetForegroundService : Service(), LifecycleOwner {
+
+    private val dispatcher = ServiceLifecycleDispatcher(this)
+    override val lifecycle get() = dispatcher.lifecycle
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private lateinit var floatManager: PetFloatManager
@@ -41,6 +46,7 @@ class PetForegroundService : Service() {
     private var startedOnce: Boolean = false
 
     override fun onCreate() {
+        dispatcher.onServicePreSuperOnCreate()
         super.onCreate()
         PetLogger.d("PetForegroundService", "Service created")
 
@@ -50,6 +56,13 @@ class PetForegroundService : Service() {
         floatManager = PetFloatManager(this)
         lifecycleCoordinator = ServiceLifecycleCoordinator(this, serviceScope)
         lifecycleCoordinator.floatManager = floatManager
+        lifecycleCoordinator.onOpenChat = { openChatDialog() }
+        lifecycleCoordinator.onSwipeDown = {
+            // 发广播给 app 层，由 app 层调用 PetAccessibilityService 执行下滑
+            sendBroadcast(Intent(ACTION_SWIPE_DOWN).apply {
+                setPackage(packageName)
+            })
+        }
         repository = PetRepository(PetPreferences(this))
         // 复用 Application 单例，与 ChatDialogActivity 共享同一个 ChatManager（历史记录一致）
         chatManager = ChatManager(this)
@@ -76,6 +89,7 @@ class PetForegroundService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        dispatcher.onServicePreSuperOnStart()
         PetLogger.d("PetForegroundService", "Service onStartCommand action=${intent?.action}")
         ensureStartedAndShown()
         // 处理来自 ModelSwitchActivity 的模型/表情/动作指令
@@ -105,17 +119,25 @@ class PetForegroundService : Service() {
                 val score = intent.getIntExtra(EXTRA_EMOTION_SCORE, 5)
                 lifecycleCoordinator.applyEmotionFromChat(score)
             }
+            ACTION_START_GESTURE -> {
+                lifecycleCoordinator.startGestureRecognition(this)
+                PetLogger.d("PetForegroundService", "Gesture recognition started via intent")
+            }
+            ACTION_STOP_GESTURE -> {
+                lifecycleCoordinator.stopGestureRecognition()
+                PetLogger.d("PetForegroundService", "Gesture recognition stopped via intent")
+            }
         }
         return START_STICKY
     }
 
     private fun openChatDialog() {
         try {
-            val intent = Intent().apply {
-                setClassName(packageName, "com.example.pet.chat.ChatDialogActivity")
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            startActivity(intent)
+            // 先广播通知 app 层关闭 Mini 悬浮条（若存在），再打开全屏聊天
+            // app 层的 ChatMiniService 会监听此广播并自行关闭
+            sendBroadcast(Intent(ACTION_CLOSE_MINI_AND_OPEN_CHAT).apply {
+                setPackage(packageName)
+            })
         } catch (e: Exception) {
             PetLogger.e("PetForegroundService", "Failed to open chat dialog", e)
         }
@@ -124,6 +146,7 @@ class PetForegroundService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        dispatcher.onServicePreSuperOnDestroy()
         super.onDestroy()
         PetLogger.d("PetForegroundService", "Service destroyed")
         try { lifecycleCoordinator.stop() } catch (e: Exception) {
@@ -132,6 +155,12 @@ class PetForegroundService : Service() {
         try { floatManager.hide() } catch (e: Exception) {
             PetLogger.e("PetForegroundService", "Failed to hide float view", e)
         }
+        // 通知 app 层关闭对话页面和 Mini 悬浮条
+        try {
+            sendBroadcast(Intent(ACTION_CLOSE_ALL_CHAT_UI).apply {
+                setPackage(packageName)
+            })
+        } catch (_: Exception) {}
         startedOnce = false
     }
 
@@ -143,6 +172,16 @@ class PetForegroundService : Service() {
         startedOnce = true
         try { lifecycleCoordinator.start() } catch (e: Exception) {
             PetLogger.e("PetForegroundService", "Failed to start coordinator", e)
+        }
+        // 恢复手势识别开关的持久化状态
+        try {
+            val prefs = com.pet.core.data.preferences.PetPreferences(this)
+            if (prefs.isGestureRecognitionEnabled()) {
+                lifecycleCoordinator.startGestureRecognition(this)
+                PetLogger.d("PetForegroundService", "Gesture recognition auto-restored")
+            }
+        } catch (e: Exception) {
+            PetLogger.e("PetForegroundService", "Failed to restore gesture recognition", e)
         }
         try { floatManager.show() } catch (e: Exception) {
             PetLogger.e("PetForegroundService", "Failed to show float view", e)
@@ -192,6 +231,13 @@ class PetForegroundService : Service() {
         const val ACTION_PLAY_MOTION     = "com.pet.action.PLAY_MOTION"
         const val ACTION_OPEN_CHAT       = "com.pet.action.OPEN_CHAT"
         const val ACTION_APPLY_EMOTION   = "com.pet.action.APPLY_EMOTION"
+        const val ACTION_START_GESTURE   = "com.pet.action.START_GESTURE"
+        const val ACTION_STOP_GESTURE    = "com.pet.action.STOP_GESTURE"
+        const val ACTION_SWIPE_DOWN      = "com.pet.action.SWIPE_DOWN"
+        /** app 层监听此广播：先关闭 Mini 条，再打开全屏聊天 */
+        const val ACTION_CLOSE_MINI_AND_OPEN_CHAT = "com.pet.action.CLOSE_MINI_AND_OPEN_CHAT"
+        /** app 层监听此广播：关闭所有聊天 UI（服务停止时发送） */
+        const val ACTION_CLOSE_ALL_CHAT_UI = "com.pet.action.CLOSE_ALL_CHAT_UI"
 
         const val EXTRA_MODEL_JSON_PATH  = "model_json_path"
         const val EXTRA_IS_EXTERNAL      = "is_external"
@@ -222,6 +268,24 @@ class PetForegroundService : Service() {
                 Intent(context, PetForegroundService::class.java).apply {
                     action = ACTION_PLAY_MOTION
                     putExtra(EXTRA_FILE_NAME, fileName)
+                }
+            )
+        }
+
+        /** 开启摄像头手势识别 */
+        fun cmdStartGesture(context: Context) {
+            context.startService(
+                Intent(context, PetForegroundService::class.java).apply {
+                    action = ACTION_START_GESTURE
+                }
+            )
+        }
+
+        /** 关闭摄像头手势识别 */
+        fun cmdStopGesture(context: Context) {
+            context.startService(
+                Intent(context, PetForegroundService::class.java).apply {
+                    action = ACTION_STOP_GESTURE
                 }
             )
         }

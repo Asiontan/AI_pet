@@ -31,7 +31,6 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:1.3.1")
     implementation("androidx.camera:camera-view:1.3.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-    // MediaPipe for hand detection (will be added when available)
-    // implementation("com.google.mediapipe:mediapipe-hand-landmark:0.8.10")
+    // MediaPipe Tasks Vision — 手势识别（0.10.20+ 支持 16KB 页面对齐）
+    implementation("com.google.mediapipe:tasks-vision:0.10.20")
 }
-

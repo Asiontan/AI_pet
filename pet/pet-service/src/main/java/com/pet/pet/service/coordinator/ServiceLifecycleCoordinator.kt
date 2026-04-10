@@ -1,9 +1,17 @@
 package com.pet.pet.service.coordinator
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
-// import android.graphics.PointF
-// import android.view.WindowManager
-// import com.pet.algorithm.path.PathPlanner
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.Build
+import androidx.core.app.NotificationCompat
+import androidx.lifecycle.LifecycleOwner
+import com.pet.algorithm.cv.CameraGestureManager
+import com.pet.algorithm.cv.Gesture
 import com.pet.algorithm.prediction.BehaviorPredictor
 import com.pet.algorithm.rl.RLBehaviorManager
 import com.pet.algorithm.sentiment.BehaviorEmotionAnalyzer
@@ -11,7 +19,7 @@ import com.pet.algorithm.sentiment.TextSentimentAnalyzer
 import com.pet.core.common.logger.PetLogger
 import com.pet.core.data.model.ModelManager
 import com.pet.core.data.preferences.PetPreferences
-// import com.pet.core.domain.model.BehaviorState  // A* 自主移动禁用后暂不使用
+import com.pet.core.domain.model.event.InteractionType
 import com.pet.core.domain.model.event.UserInteractionEvent
 import com.pet.pet.behavior.statemachine.PetBehaviorStateMachine
 import com.pet.pet.floating.manager.PetFloatManager
@@ -23,328 +31,517 @@ import kotlinx.coroutines.launch
 
 /**
  * 服务生命周期协调器
- * 整合所有算法模块和功能模块
- * - 情绪分析结果反馈给 RLBehaviorManager 影响行为决策
- * - 根据行为状态驱动宠物自主移动（A*路径规划，暂时禁用）
+ * 新增功能：
+ * - 亲密度系统：每次交互 +1，聊天完成 +2，每小时闲置超8小时 -1
+ * - 在线时长统计：停止服务时累加
+ * - 关心通知：超过2小时未交互推送通知（每3小时冷却）
+ * - 气泡进场/退场动画、打字机光标闪烁（已在 PetBubbleView 实现）
  */
 class ServiceLifecycleCoordinator(
     private val context: Context,
     private val scope: CoroutineScope
 ) {
+    companion object {
+        private const val TAG = "ServiceLifecycleCoordinator"
+        private const val CARE_NOTIFY_CHANNEL    = "pet_care_channel"
+        private const val CARE_NOTIFY_ID         = 2001
+        private const val CARE_IDLE_THRESHOLD_MS  = 2 * 60 * 60 * 1000L  // 2小时
+        private const val CARE_NOTIFY_COOLDOWN_MS = 3 * 60 * 60 * 1000L  // 3小时冷却
+        private const val BOND_DECAY_IDLE_MS      = 8 * 60 * 60 * 1000L  // 8小时触发衰减
+    }
 
     private lateinit var rlBehaviorManager: RLBehaviorManager
     private lateinit var behaviorStateMachine: PetBehaviorStateMachine
     private lateinit var textSentimentAnalyzer: TextSentimentAnalyzer
     private lateinit var behaviorEmotionAnalyzer: BehaviorEmotionAnalyzer
     private lateinit var behaviorPredictor: BehaviorPredictor
-    // private lateinit var pathPlanner: PathPlanner  // A* 路径规划（暂时禁用）
     private lateinit var preferences: PetPreferences
 
-    // A* 路径规划移动状态（暂时禁用）
-    // private var currentPath: List<PointF> = emptyList()
-    // private var pathIndex: Int = 0
-    // private var isMoving: Boolean = false
-
-    // 悬浮窗管理器引用（由 PetForegroundService 注入）
     var floatManager: PetFloatManager? = null
-
-    // 聊天管理器引用（由 PetForegroundService 注入）
     var chatManager: ChatManager? = null
+    /** 打开聊天界面的回调，由 PetForegroundService 注入 */
+    var onOpenChat: (() -> Unit)? = null
+    /** 执行屏幕下滑的回调，由 PetForegroundService 注入 */
+    var onSwipeDown: (() -> Unit)? = null
+
+    /** 手势识别管理器，调用 startGestureRecognition() 后启动 */
+    private var cameraGestureManager: CameraGestureManager? = null
 
     private var isRunning = false
+    private var serviceStartTimeMs = 0L
+    private var lastUserInteractionMs = System.currentTimeMillis()
 
-    // 上一次情绪等级，用于检测变化（避免重复播放相同表情）
+    private val careMessages = listOf(
+        "好久不见啦，你在做什么呢？(｡•ᴗ•｡)",
+        "主人，记得休息一下哦~",
+        "我想你了！快来陪我玩吧！",
+        "喝水了吗？记得保持水分哦！",
+        "今天辛苦了，给你一个虚拟拥抱 ♡",
+        "你不来找我，我可要来找你了！",
+        "主人有没有好好吃饭呀？",
+        "外面天气怎么样？我只能从屏幕看世界..."
+    )
+
+    // 气泡 BroadcastReceiver
+    private val bubbleReceiver = object : BroadcastReceiver() {
+        override fun onReceive(ctx: Context, intent: Intent) {
+            when (intent.action) {
+                ChatManager.ACTION_BUBBLE_TOKEN -> {
+                    val token = intent.getStringExtra(ChatManager.EXTRA_TOKEN) ?: return
+                    val fm = floatManager ?: return
+                    if (!fm.isBubbleShowing()) fm.showBubble()
+                    fm.appendBubbleToken(token)
+                }
+                ChatManager.ACTION_BUBBLE_DONE -> {
+                    floatManager?.onBubbleReplyDone()
+                    if (::preferences.isInitialized) {
+                        preferences.addBond(2)
+                        preferences.incrementChatCount()
+                        PetLogger.d(TAG, "Chat done: bond=${preferences.getBondLevel()}, chats=${preferences.getTotalChatCount()}")
+                    }
+                }
+            }
+        }
+    }
+
+    // ── 情绪等级映射 ─────────────────────────────────────────────────
+
     private var lastEmotionLevel: EmotionLevel = EmotionLevel.NEUTRAL
-
-    /** 情绪等级枚举，对应不同的表情关键词 */
     private enum class EmotionLevel { NEGATIVE, NEUTRAL, POSITIVE }
 
-    /** 将情绪分（0-10）映射到等级 */
     private fun emotionToLevel(emotion: Int): EmotionLevel = when {
         emotion <= 3 -> EmotionLevel.NEGATIVE
         emotion >= 7 -> EmotionLevel.POSITIVE
-        else          -> EmotionLevel.NEUTRAL
+        else         -> EmotionLevel.NEUTRAL
     }
 
-    /**
-     * 根据情绪等级，在当前模型的表情列表中查找匹配的表情文件名。
-     * 匹配规则：表情文件名（不含扩展名）包含对应关键词（大小写不敏感）。
-     * 若没有匹配项则返回 null，不作处理。
-     */
     private fun findExpressionForLevel(level: EmotionLevel, expressions: List<String>): String? {
-        val positiveKeywords = listOf("happy", "smile", "joy", "excited", "开心", "高兴", "快乐", "喜", "笑")
-        val negativeKeywords = listOf("sad", "angry", "cry", "fear", "pain", "hurt", "难过", "伤心", "哭", "生气", "愤怒")
         val keywords = when (level) {
-            EmotionLevel.POSITIVE -> positiveKeywords
-            EmotionLevel.NEGATIVE -> negativeKeywords
-            EmotionLevel.NEUTRAL  -> return null  // 中性不主动切换表情
+            EmotionLevel.POSITIVE -> listOf("happy", "smile", "joy", "excited", "开心", "高兴", "快乐", "喜", "笑")
+            EmotionLevel.NEGATIVE -> listOf("sad", "angry", "cry", "fear", "pain", "hurt", "难过", "伤心", "哭", "生气", "愤怒")
+            EmotionLevel.NEUTRAL  -> return null
         }
-        val nameLower = expressions.map { it.removeSuffix(".exp3.json").lowercase() }
-        for (keyword in keywords) {
-            val idx = nameLower.indexOfFirst { it.contains(keyword) }
-            if (idx >= 0) return expressions[idx]
-        }
+        val names = expressions.map { it.removeSuffix(".exp3.json").lowercase() }
+        keywords.forEach { kw -> names.indexOfFirst { it.contains(kw) }.takeIf { it >= 0 }?.let { return expressions[it] } }
         return null
     }
 
-    /**
-     * 根据情绪等级，在当前模型的动作列表中查找匹配的动作文件名。
-     */
     private fun findMotionForLevel(level: EmotionLevel, motions: List<String>): String? {
-        val positiveKeywords = listOf("happy", "excited", "joy", "dance", "wave", "cheer", "开心", "高兴", "欢快", "跳舞")
-        val negativeKeywords = listOf("sad", "cry", "angry", "depressed", "hurt", "难过", "伤心", "哭", "生气")
-        val neutralKeywords  = listOf("idle", "normal", "relax", "calm", "breath", "待机", "放松", "呼吸")
         val keywords = when (level) {
-            EmotionLevel.POSITIVE -> positiveKeywords
-            EmotionLevel.NEGATIVE -> negativeKeywords
-            EmotionLevel.NEUTRAL  -> neutralKeywords
+            EmotionLevel.POSITIVE -> listOf("happy", "excited", "joy", "dance", "wave", "cheer", "开心", "高兴", "欢快", "跳舞")
+            EmotionLevel.NEGATIVE -> listOf("sad", "cry", "angry", "depressed", "hurt", "难过", "伤心", "哭", "生气")
+            EmotionLevel.NEUTRAL  -> listOf("idle", "normal", "relax", "calm", "breath", "待机", "放松", "呼吸")
         }
-        val nameLower = motions.map { it.removeSuffix(".motion3.json").lowercase() }
-        for (keyword in keywords) {
-            val idx = nameLower.indexOfFirst { it.contains(keyword) }
-            if (idx >= 0) return motions[idx]
-        }
-        // 中性时兜底取第一个动作（让宠物有基本反应）
+        val names = motions.map { it.removeSuffix(".motion3.json").lowercase() }
+        keywords.forEach { kw -> names.indexOfFirst { it.contains(kw) }.takeIf { it >= 0 }?.let { return motions[it] } }
         if (level == EmotionLevel.NEUTRAL && motions.isNotEmpty()) return motions[0]
         return null
     }
 
-    /**
-     * 当情绪等级发生变化时，尝试播放对应表情和动作。
-     * - 表情（exp3）：精确匹配关键词
-     * - 动作（motion3）：匹配关键词，中性时兜底播放第一个动作
-     * 如果当前模型没有对应资源，则跳过该项。
-     */
     private fun applyEmotionExpression(emotion: Int) {
         val newLevel = emotionToLevel(emotion)
-        if (newLevel == lastEmotionLevel) return  // 等级未变化，不重复播放
+        if (newLevel == lastEmotionLevel) return
         lastEmotionLevel = newLevel
-
         val fm = floatManager ?: return
-        val activeModelId = ModelManager.getActiveModelId(context)
-        val modelInfo = ModelManager.findModel(context, activeModelId) ?: return
-
-        // 1. 播放表情（exp3）
+        val modelInfo = ModelManager.findModel(context, ModelManager.getActiveModelId(context)) ?: return
         if (modelInfo.expressions.isNotEmpty()) {
-            val expFileName = findExpressionForLevel(newLevel, modelInfo.expressions)
-            if (expFileName != null) {
-                fm.playExpression(expFileName)
-                PetLogger.d("ServiceLifecycleCoordinator",
-                    "情绪$emotion($newLevel) → 表情: $expFileName")
-            } else {
-                // 积极/消极无匹配表情时清除当前表情回默认
-                if (newLevel != EmotionLevel.NEUTRAL) fm.playExpression("")
-                PetLogger.d("ServiceLifecycleCoordinator",
-                    "情绪$emotion($newLevel) → 无匹配表情，跳过")
-            }
+            val exp = findExpressionForLevel(newLevel, modelInfo.expressions)
+            if (exp != null) fm.playExpression(exp)
+            else if (newLevel != EmotionLevel.NEUTRAL) fm.playExpression("")
+            PetLogger.d(TAG, "emotion=$emotion($newLevel) exp=${exp ?: "none"}")
         }
-
-        // 2. 播放动作（motion3）
         if (modelInfo.motions.isNotEmpty()) {
-            val motFileName = findMotionForLevel(newLevel, modelInfo.motions)
-            if (motFileName != null) {
-                fm.playMotionFile(motFileName)
-                PetLogger.d("ServiceLifecycleCoordinator",
-                    "情绪$emotion($newLevel) → 动作: $motFileName")
-            } else {
-                PetLogger.d("ServiceLifecycleCoordinator",
-                    "情绪$emotion($newLevel) → 无匹配动作，跳过")
-            }
-        }
-
-        if (modelInfo.expressions.isEmpty() && modelInfo.motions.isEmpty()) {
-            PetLogger.d("ServiceLifecycleCoordinator",
-                "模型 ${modelInfo.name} 无表情/动作资源，跳过情绪映射")
+            val mot = findMotionForLevel(newLevel, modelInfo.motions)
+            if (mot != null) fm.playMotionFile(mot)
+            PetLogger.d(TAG, "emotion=$emotion($newLevel) motion=${mot ?: "none"}")
         }
     }
 
-    /**
-     * 启动协调器
-     */
+    // ── 生命周期 ──────────────────────────────────────────────────────
+
     fun start() {
         if (isRunning) return
         isRunning = true
+        serviceStartTimeMs = System.currentTimeMillis()
+        lastUserInteractionMs = serviceStartTimeMs
 
-        // 初始化所有模块
         preferences = PetPreferences(context)
         rlBehaviorManager = RLBehaviorManager(context, scope)
         behaviorStateMachine = PetBehaviorStateMachine(rlBehaviorManager)
+        preferences.saveServiceStartTime(serviceStartTimeMs)
 
-        // 恢复上次持久化的情绪值
         scope.launch(Dispatchers.IO) {
             val savedEmotion = preferences.getPetEmotion()
             rlBehaviorManager.updateEmotion(savedEmotion)
-            PetLogger.d("ServiceLifecycleCoordinator", "Restored emotion=$savedEmotion")
+            PetLogger.d(TAG, "Restored emotion=$savedEmotion bond=${preferences.getBondLevel()} onlineMin=${preferences.getTotalOnlineMinutes()}")
         }
-        textSentimentAnalyzer = TextSentimentAnalyzer(context)
+
+        textSentimentAnalyzer   = TextSentimentAnalyzer(context)
         behaviorEmotionAnalyzer = BehaviorEmotionAnalyzer(context)
-        behaviorPredictor = BehaviorPredictor(context)
+        behaviorPredictor       = BehaviorPredictor(context)
 
-        // A* 路径规划初始化（暂时禁用）
-        // val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        // val dm = android.util.DisplayMetrics()
-        // try {
-        //     @Suppress("DEPRECATION")
-        //     wm.defaultDisplay.getRealMetrics(dm)
-        // } catch (_: Exception) {}
-        // val screenW = if (dm.widthPixels > 0) dm.widthPixels else 1080
-        // val screenH = if (dm.heightPixels > 0) dm.heightPixels else 1920
-        // pathPlanner = PathPlanner(screenW, screenH, gridSize = 30)
+        createCareNotifyChannel()
 
-        // 启动定期更新
         scope.launch { periodicUpdate() }
-        // 启动前台应用检测（高频，5秒一次）
         scope.launch { foregroundAppLoop() }
-        // 启动自主移动调度（暂时禁用）
-        // scope.launch { autonomousMoveLoop() }
+        scope.launch { bondDecayLoop() }
+        scope.launch { careNotifyLoop() }
 
-        PetLogger.d("ServiceLifecycleCoordinator", "Coordinator started")
+        val filter = IntentFilter().apply {
+            addAction(ChatManager.ACTION_BUBBLE_TOKEN)
+            addAction(ChatManager.ACTION_BUBBLE_DONE)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(bubbleReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            context.registerReceiver(bubbleReceiver, filter)
+        }
+        PetLogger.d(TAG, "Coordinator started")
     }
 
-    /**
-     * 停止协调器
-     */
     fun stop() {
         isRunning = false
-        // currentPath = emptyList()  // A* 暂时禁用
-        // isMoving = false           // A* 暂时禁用
-        // 持久化当前情绪值，下次启动时恢复
+        cameraGestureManager?.stop()
+        cameraGestureManager = null
+        try { context.unregisterReceiver(bubbleReceiver) } catch (_: Exception) {}
+        floatManager?.hideBubble()
         if (::rlBehaviorManager.isInitialized && ::preferences.isInitialized) {
             preferences.savePetEmotion(rlBehaviorManager.getCurrentEmotion())
-            PetLogger.d("ServiceLifecycleCoordinator", "Saved emotion=${rlBehaviorManager.getCurrentEmotion()}")
+            val onlineMin = (System.currentTimeMillis() - serviceStartTimeMs) / 60_000L
+            if (onlineMin > 0) preferences.addOnlineMinutes(onlineMin)
+            PetLogger.d(TAG, "stop: emotion=${rlBehaviorManager.getCurrentEmotion()} +${onlineMin}min total=${preferences.getTotalOnlineMinutes()}min bond=${preferences.getBondLevel()}")
         }
-        PetLogger.d("ServiceLifecycleCoordinator", "Coordinator stopped")
+        PetLogger.d(TAG, "Coordinator stopped")
     }
 
-    /**
-     * 对话情绪联动：聊天回复完成后由 PetForegroundService 调用
-     * 强制刷新情绪等级（忽略等级相同的防抖逻辑）
-     */
     fun applyEmotionFromChat(emotionScore: Int) {
-        lastEmotionLevel = EmotionLevel.NEUTRAL // 重置，确保一定触发
+        lastEmotionLevel = EmotionLevel.NEUTRAL
         applyEmotionExpression(emotionScore)
-        if (::rlBehaviorManager.isInitialized) {
-            rlBehaviorManager.updateEmotion(emotionScore)
-        }
+        if (::rlBehaviorManager.isInitialized) rlBehaviorManager.updateEmotion(emotionScore)
     }
 
-    /**
-     * 处理用户交互
-     */
     fun handleUserInteraction(interaction: UserInteractionEvent) {
         if (!isRunning) return
-        // 用户交互时中断自主移动（A* 暂时禁用）
-        // isMoving = false
-        // currentPath = emptyList()
+        lastUserInteractionMs = System.currentTimeMillis()
+        if (::preferences.isInitialized) {
+            preferences.addBond(1)
+            PetLogger.d(TAG, "Interaction bond=${preferences.getBondLevel()}")
+        }
         scope.launch {
             val newState = behaviorStateMachine.handleInteraction(interaction)
-            PetLogger.d("ServiceLifecycleCoordinator", "Interaction: ${interaction.type}, State: $newState")
+            PetLogger.d(TAG, "Interaction: ${interaction.type} -> $newState")
         }
     }
 
-    /**
-     * 定期更新：情绪分析 → 反馈给 RL → 更新行为状态
-     */
+    // ── 协程循环 ──────────────────────────────────────────────────────
+
     private suspend fun periodicUpdate() {
         while (isRunning) {
             try {
-                // 1. 分析当前情绪（行为分析）
                 val emotion = behaviorEmotionAnalyzer.analyzeBehaviorEmotion()
-                PetLogger.d("ServiceLifecycleCoordinator", "Emotion: $emotion")
-
-                // 2. 将情绪值同步到 RLBehaviorManager（影响下次行为决策）
+                PetLogger.d(TAG, "Emotion=$emotion")
                 rlBehaviorManager.updateEmotion(emotion)
-
-                // 3. 情绪映射到宠物表情（如果当前模型有对应表情）
                 applyEmotionExpression(emotion)
 
-                // 4. 驱动行为状态机定期更新
                 val newState = behaviorStateMachine.updatePeriodic()
-                PetLogger.d("ServiceLifecycleCoordinator", "Periodic state: $newState")
+                PetLogger.d(TAG, "Periodic state=$newState")
 
-                // 4. A* 自主移动触发（暂时禁用）
-                // if (newState == BehaviorState.WALK && !isMoving) {
-                //     triggerAutonomousMove()
-                // }
-
-                // 5. 预测用户行为并打印详细日志
-                val predictions = behaviorPredictor.predictNextHour()
-                if (predictions.isNotEmpty()) {
-                    predictions.forEachIndexed { index, p ->
-                        val appName = behaviorEmotionAnalyzer.getAppName(p.packageName)
-                        val minutesLater = (p.predictedTime - System.currentTimeMillis()) / 60_000L
-                        val confidencePct = (p.confidence * 100).toInt()
-                        PetLogger.d("ServiceLifecycleCoordinator",
-                            "行为预测[${index + 1}] 约${minutesLater}分钟后使用「$appName」，置信度：${confidencePct}%")
+                val preds = behaviorPredictor.predictNextHour()
+                if (preds.isNotEmpty()) {
+                    preds.forEachIndexed { i, p ->
+                        val name   = behaviorEmotionAnalyzer.getAppName(p.packageName)
+                        val minLater = (p.predictedTime - System.currentTimeMillis()) / 60_000L
+                        val pct    = (p.confidence * 100).toInt()
+                        PetLogger.d(TAG, "预测[${i+1}] ~${minLater}min后「$name」置信${pct}%")
                     }
                 } else {
-                    PetLogger.d("ServiceLifecycleCoordinator", "行为预测：暂无预测结果（历史数据不足）")
+                    PetLogger.d(TAG, "行为预测：暂无（历史不足）")
                 }
-
-                delay(30_000L) // 测试模式：30秒更新一次（正式发布改回 60_000L）
+                delay(30_000L)
             } catch (e: Exception) {
-                PetLogger.e("ServiceLifecycleCoordinator", "Error in periodicUpdate", e)
+                PetLogger.e(TAG, "periodicUpdate error", e)
                 delay(10_000L)
             }
         }
     }
 
-    // A* 自主移动循环（暂时禁用）
-    // private suspend fun autonomousMoveLoop() {
-    //     while (isRunning) {
-    //         try {
-    //             if (isMoving && pathIndex < currentPath.size) {
-    //                 val target = currentPath[pathIndex]
-    //                 floatManager?.movePetTo(target.x.toInt(), target.y.toInt())
-    //                 pathIndex++
-    //                 if (pathIndex >= currentPath.size) {
-    //                     isMoving = false
-    //                     PetLogger.d("ServiceLifecycleCoordinator", "Autonomous move completed")
-    //                 }
-    //                 delay(60L)
-    //             } else {
-    //                 delay(200L)
-    //             }
-    //         } catch (e: Exception) {
-    //             PetLogger.e("ServiceLifecycleCoordinator", "Error in autonomousMoveLoop", e)
-    //             delay(500L)
-    //         }
-    //     }
-    // }
-
-    // A* 触发自主移动（暂时禁用）
-    // fun triggerAutonomousMove() {
-    //     val fm = floatManager ?: return
-    //     val currentPos = fm.getCurrentPosition() ?: return
-    //     val screenW = pathPlanner.screenWidth
-    //     val screenH = pathPlanner.screenHeight
-    //     val margin = 150
-    //     val targetX = (margin + Math.random() * (screenW - margin * 2)).toFloat()
-    //     val targetY = (margin + Math.random() * (screenH - margin * 2)).toFloat()
-    //     val start = PointF(currentPos.first.toFloat(), currentPos.second.toFloat())
-    //     val end = PointF(targetX, targetY)
-    //     val rough = pathPlanner.findPath(start, end)
-    //     val smooth = pathPlanner.smoothPath(rough)
-    //     currentPath = smooth
-    //     pathIndex = 0
-    //     isMoving = smooth.size > 1
-    //     PetLogger.d("ServiceLifecycleCoordinator", "Autonomous move: ${start} -> ${end}, path=${smooth.size} pts")
-    // }
-
-    /**
-     * 前台应用检测循环（每5秒一次，仅打印日志）
-     * 相比 periodicUpdate 更高频，用于近实时感知用户当前在用哪个应用
-     */
     private suspend fun foregroundAppLoop() {
         while (isRunning) {
             try {
-                val foregroundApp = behaviorEmotionAnalyzer.getCurrentForegroundApp()
-                val appName = foregroundApp?.let { behaviorEmotionAnalyzer.getAppName(it) } ?: "null"
-                PetLogger.d("ServiceLifecycleCoordinator", "Foreground app: $foregroundApp ($appName)")
+                val pkg  = behaviorEmotionAnalyzer.getCurrentForegroundApp()
+                val name = pkg?.let { behaviorEmotionAnalyzer.getAppName(it) } ?: "null"
+                PetLogger.d(TAG, "Foreground: $pkg ($name)")
             } catch (e: Exception) {
-                PetLogger.e("ServiceLifecycleCoordinator", "foregroundAppLoop error", e)
+                PetLogger.e(TAG, "foregroundAppLoop error", e)
             }
             delay(5_000L)
+        }
+    }
+
+    /**
+     * 亲密度衰减循环：每小时检查一次，超过 8 小时无交互则 -1
+     */
+    private suspend fun bondDecayLoop() {
+        while (isRunning) {
+            delay(60 * 60 * 1000L)
+            if (!::preferences.isInitialized) continue
+            val idleMs = System.currentTimeMillis() - lastUserInteractionMs
+            if (idleMs > BOND_DECAY_IDLE_MS) {
+                preferences.addBond(-1)
+                PetLogger.d(TAG, "Bond decay: bond=${preferences.getBondLevel()} idleMs=$idleMs")
+            }
+        }
+    }
+
+    /**
+     * 关心通知循环：每 30 分钟检查一次
+     * 若超过 2 小时未交互且距上次通知超过 3 小时则发送
+     */
+    private suspend fun careNotifyLoop() {
+        while (isRunning) {
+            delay(30 * 60 * 1000L)
+            if (!::preferences.isInitialized) continue
+            val now       = System.currentTimeMillis()
+            val idleMs    = now - lastUserInteractionMs
+            val lastNotify = preferences.getLastCareNotifyTime()
+            if (idleMs >= CARE_IDLE_THRESHOLD_MS && (now - lastNotify) >= CARE_NOTIFY_COOLDOWN_MS) {
+                sendCareNotification()
+                preferences.saveLastCareNotifyTime(now)
+            }
+        }
+    }
+
+    // ── 关心通知 ──────────────────────────────────────────────────────
+
+    private fun createCareNotifyChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CARE_NOTIFY_CHANNEL,
+                "宠物关心提醒",
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = "桌宠定期发送关心消息"
+                enableVibration(true)
+            }
+            (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+                .createNotificationChannel(channel)
+        }
+    }
+
+    private fun sendCareNotification() {
+        try {
+            val msg = careMessages.random()
+            val launchIntent = context.packageManager
+                .getLaunchIntentForPackage(context.packageName)
+                ?: Intent().apply { setClassName(context.packageName, "com.example.pet.MainActivity") }
+            val pi = PendingIntent.getActivity(
+                context, CARE_NOTIFY_ID, launchIntent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+            val notification = NotificationCompat.Builder(context, CARE_NOTIFY_CHANNEL)
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setContentTitle("你的桌宠在想你~")
+                .setContentText(msg)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(msg))
+                .setContentIntent(pi)
+                .setAutoCancel(true)
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .build()
+            (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+                .notify(CARE_NOTIFY_ID, notification)
+            PetLogger.d(TAG, "Care notification sent: $msg")
+        } catch (e: Exception) {
+            PetLogger.e(TAG, "sendCareNotification failed", e)
+        }
+    }
+
+    // ── 手势识别 ──────────────────────────────────────────────────────
+
+    /**
+     * 启动摄像头手势识别
+     * @param lifecycleOwner 传入宿主 Service 对应的 LifecycleOwner
+     */
+    fun startGestureRecognition(lifecycleOwner: LifecycleOwner) {
+        if (cameraGestureManager != null) return
+        cameraGestureManager = CameraGestureManager(context, scope).also { mgr ->
+            mgr.onGestureDetected = { gesture ->
+                onGestureReceived(gesture)
+            }
+            mgr.start(lifecycleOwner)
+        }
+        PetLogger.d(TAG, "Gesture recognition started")
+    }
+
+    /** 停止手势识别并释放摄像头 */
+    fun stopGestureRecognition() {
+        cameraGestureManager?.stop()
+        cameraGestureManager = null
+        PetLogger.d(TAG, "Gesture recognition stopped")
+    }
+
+    /** 是否正在进行手势识别 */
+    fun isGestureRecognitionRunning(): Boolean =
+        cameraGestureManager?.isRunning() == true
+
+    /**
+     * 将手势映射为宠物交互事件
+     * THUMBS_UP / PEACE  → CLICK（正向互动，亲密度 +1）
+     * WAVE / FIST        → DOUBLE_CLICK（触发特殊动作）
+     * POINT              → LONG_PRESS（唤起聊天）
+     */
+    private fun onGestureReceived(gesture: Gesture) {
+        if (!isRunning) return
+        PetLogger.d(TAG, "Gesture received: $gesture")
+
+        // POINT 手势直接打开聊天（与长按宠物效果一致）
+        if (gesture == Gesture.POINT) {
+            lastUserInteractionMs = System.currentTimeMillis()
+            if (::preferences.isInitialized) preferences.addBond(1)
+            // 先打开聊天，300ms 后再更新情绪避免同帧卡顿
+            onOpenChat?.invoke()
+            scope.launch {
+                kotlinx.coroutines.delay(300L)
+                applyEmotionFromChat(5)
+            }
+            PetLogger.d(TAG, "Gesture POINT: opening chat via onOpenChat callback")
+            return
+        }
+
+        // FIST 手势打开抖音
+        if (gesture == Gesture.FIST) {
+            lastUserInteractionMs = System.currentTimeMillis()
+            if (::preferences.isInitialized) preferences.addBond(1)
+            applyEmotionFromChat(6)
+            launchDouyinOrToast()
+            PetLogger.d(TAG, "Gesture FIST: launching Douyin")
+            return
+        }
+
+        // THUMBS_UP 手势打开微信
+        if (gesture == Gesture.THUMBS_UP) {
+            lastUserInteractionMs = System.currentTimeMillis()
+            if (::preferences.isInitialized) preferences.addBond(1)
+            applyEmotionFromChat(8)
+            launchWechatOrToast()
+            PetLogger.d(TAG, "Gesture THUMBS_UP: launching WeChat")
+            return
+        }
+
+        // PEACE 手势返回桌面
+        if (gesture == Gesture.PEACE) {
+            lastUserInteractionMs = System.currentTimeMillis()
+            if (::preferences.isInitialized) preferences.addBond(1)
+            applyEmotionFromChat(7)
+            goHome()
+            PetLogger.d(TAG, "Gesture PEACE: go home")
+            return
+        }
+
+        // WAVE 手势在当前前台 App 执行下滑
+        if (gesture == Gesture.WAVE) {
+            lastUserInteractionMs = System.currentTimeMillis()
+            if (::preferences.isInitialized) preferences.addBond(1)
+            applyEmotionFromChat(6)
+            performSwipeDown()
+            PetLogger.d(TAG, "Gesture WAVE: swipe down")
+            return
+        }
+
+        // 其他手势无操作
+        return
+    }
+
+    /**
+     * 通过 AccessibilityService 在当前前台 App 执行下滑手势
+     * 若无障碍服务未开启则弹 Toast 提示
+     */
+    private fun performSwipeDown() {
+        if (onSwipeDown != null) {
+            onSwipeDown?.invoke()
+            PetLogger.d(TAG, "performSwipeDown: dispatched via callback")
+        } else {
+            scope.launch(Dispatchers.Main) {
+                android.widget.Toast.makeText(
+                    context,
+                    "请先在「设置 → 无障碍」中开启 Pet Desktop 手势控制服务",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+            }
+            PetLogger.w(TAG, "onSwipeDown callback not set, AccessibilityService may not be running")
+        }
+    }
+
+    /**
+     * 返回桌面（发送 HOME Intent）
+     */
+    private fun goHome() {
+        try {
+            val homeIntent = android.content.Intent(android.content.Intent.ACTION_MAIN).apply {
+                addCategory(android.content.Intent.CATEGORY_HOME)
+                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(homeIntent)
+            PetLogger.d(TAG, "Go home successfully")
+        } catch (e: Exception) {
+            PetLogger.e(TAG, "goHome failed", e)
+        }
+    }
+
+    /**
+     * 打开微信，若未安装则弹 Toast 提示
+     * 微信包名：com.tencent.mm
+     */
+    private fun launchWechatOrToast() {
+        val wechatPackage = "com.tencent.mm"
+        try {
+            val launchIntent = context.packageManager.getLaunchIntentForPackage(wechatPackage)
+            if (launchIntent != null) {
+                launchIntent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(launchIntent)
+                PetLogger.d(TAG, "WeChat launched successfully")
+            } else {
+                scope.launch(Dispatchers.Main) {
+                    android.widget.Toast.makeText(
+                        context,
+                        "未检测到微信，请先安装微信~",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                }
+                PetLogger.d(TAG, "WeChat not installed")
+            }
+        } catch (e: Exception) {
+            PetLogger.e(TAG, "launchWechatOrToast failed", e)
+        }
+    }
+
+    // ── 应用启动工具 ──────────────────────────────────────────────────
+
+    /**
+     * 打开抖音，若未安装则弹 Toast 提示
+     * 抖音包名：com.ss.android.ugc.aweme
+     */
+    private fun launchDouyinOrToast() {
+        val douyinPackage = "com.ss.android.ugc.aweme"
+        try {
+            val launchIntent = context.packageManager.getLaunchIntentForPackage(douyinPackage)
+            if (launchIntent != null) {
+                launchIntent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(launchIntent)
+                PetLogger.d(TAG, "Douyin launched successfully")
+            } else {
+                // 抖音未安装，在主线程弹 Toast
+                scope.launch(Dispatchers.Main) {
+                    android.widget.Toast.makeText(
+                        context,
+                        "未检测到抖音，请先安装抖音~",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                }
+                PetLogger.d(TAG, "Douyin not installed")
+            }
+        } catch (e: Exception) {
+            PetLogger.e(TAG, "launchDouyinOrToast failed", e)
         }
     }
 }

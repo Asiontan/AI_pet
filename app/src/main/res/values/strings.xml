@@ -9,13 +9,14 @@
     <string name="ui_start_service">启动宠物服务</string>
     <string name="ui_stop_service">停止宠物服务</string>
 
-    <string name="ui_permission_granted">已授权</string>
-    <string name="ui_permission_denied">未授权</string>
-    <string name="ui_permission_state_fmt">权限状态：悬浮窗=%1$s，通知=%2$s</string>
+    <string name="ui_permission_granted">✓ 已授权</string>
+    <string name="ui_permission_denied">✗ 未授权</string>
+    <string name="ui_permission_state_fmt">悬浮窗：%1$s　通知：%2$s</string>
 
-    <string name="ui_service_hint">服务状态：请点击“启动/停止”进行控制</string>
-    <string name="ui_service_start_requested">服务状态：已请求启动（请看通知栏）</string>
-    <string name="ui_service_stop_requested">服务状态：已请求停止</string>
+    <string name="ui_service_hint">服务状态：请点击"启动/停止"进行控制</string>
+    <string name="ui_service_start_requested">服务状态：● 已请求启动</string>
+    <string name="ui_service_stop_requested">服务状态：○ 已请求停止</string>
     <string name="ui_service_start_failed_fmt">服务状态：启动失败（%1$s）</string>
     <string name="ui_service_stop_failed_fmt">服务状态：停止失败（%1$s）</string>
+    <string name="accessibility_service_description">允许 Pet Desktop 通过手势识别模拟屏幕滑动操作（如挥手下滑刷视频）</string>
 </resources>

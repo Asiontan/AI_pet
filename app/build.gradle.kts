@@ -45,6 +45,11 @@ android {
         buildConfig = true
     }
 
+    lint {
+        // MediaPipe tasks-vision JNI 库暂未支持 16KB 页面对齐，等官方修复后移除此抑制
+        disable += "16KbPages"
+    }
+
     // 避免将不兼容16KB页面大小的JNI库打进APK（如某些第三方库可能携带的TFLite .so）
     packaging {
         jniLibs {
@@ -52,6 +57,8 @@ android {
                 "**/libtensorflowlite_jni.so",
                 "**/libimage_processing_util_jni.so"
             )
+            // 启用 16KB 页面对齐，满足 Google Play 2025 年 11 月要求
+            useLegacyPackaging = false
         }
     }
 

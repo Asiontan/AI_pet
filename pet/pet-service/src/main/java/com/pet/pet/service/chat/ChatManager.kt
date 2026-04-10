@@ -13,8 +13,9 @@ import org.json.JSONObject
 import java.io.File
 
 /**
- * 聊天管理器
+ * 聊天管理器（升级版）
  * - 维护对话历史（最近 40 条），持久化到本地 JSON 文件
+ * - 支持自定义系统提示词（通过 PetPreferences 持久化）
  * - 调用 DeepSeek 流式 API
  * - 回复完成后通过 TextSentimentAnalyzer 分析情绪，联动宠物表情/动作
  */
@@ -25,6 +26,8 @@ class ChatManager(private val context: Context) {
         const val ACTION_CHAT_TOKEN   = "com.pet.chat.ACTION_TOKEN"
         const val ACTION_CHAT_DONE    = "com.pet.chat.ACTION_DONE"
         const val ACTION_CHAT_ERROR   = "com.pet.chat.ACTION_ERROR"
+        const val ACTION_BUBBLE_TOKEN = "com.pet.chat.ACTION_BUBBLE_TOKEN"
+        const val ACTION_BUBBLE_DONE  = "com.pet.chat.ACTION_BUBBLE_DONE"
         const val EXTRA_TOKEN         = "extra_token"
         const val EXTRA_FULL_REPLY    = "extra_full_reply"
         const val EXTRA_EMOTION_SCORE = "extra_emotion_score"
@@ -41,12 +44,9 @@ class ChatManager(private val context: Context) {
     private val history = mutableListOf<ChatMessage>()
     private var currentCall: Call? = null
 
-    // 初始化时从本地文件加载历史记录
-    init {
-        loadHistory()
-    }
+    init { loadHistory() }
 
-    // ---- 历史记录持久化 ----
+    // ── 历史记录持久化 ────────────────────────────────────────────────
 
     private fun historyFile(): File = File(context.filesDir, HISTORY_FILE)
 
@@ -58,15 +58,13 @@ class ChatManager(private val context: Context) {
             history.clear()
             for (i in 0 until json.length()) {
                 val obj = json.getJSONObject(i)
-                history.add(
-                    ChatMessage(
-                        id      = obj.getLong("id"),
-                        content = obj.getString("content"),
-                        isUser  = obj.getBoolean("isUser")
-                    )
-                )
+                history.add(ChatMessage(
+                    id      = obj.getLong("id"),
+                    content = obj.getString("content"),
+                    isUser  = obj.getBoolean("isUser")
+                ))
             }
-            PetLogger.d(TAG, "Loaded ${history.size} messages from history")
+            PetLogger.d(TAG, "Loaded ${history.size} messages")
         } catch (e: Exception) {
             PetLogger.e(TAG, "Failed to load history", e)
         }
@@ -93,7 +91,7 @@ class ChatManager(private val context: Context) {
         try { historyFile().delete() } catch (_: Exception) {}
     }
 
-    // ---- API Key ----
+    // ── API Key ───────────────────────────────────────────────────────
 
     fun saveApiKey(key: String) {
         context.getSharedPreferences("pet_chat_prefs", Context.MODE_PRIVATE)
@@ -110,7 +108,31 @@ class ChatManager(private val context: Context) {
         } catch (_: Exception) { "" }
     }
 
-    // ---- 消息发送 ----
+    // ── 系统提示词 ────────────────────────────────────────────────────
+
+    /**
+     * 获取当前系统提示词：
+     * - 用户已自定义：使用自定义内容
+     * - 否则使用默认桌宠人设
+     */
+    fun getSystemPrompt(): String {
+        val custom = prefs.getCustomSystemPrompt()
+        return if (custom.isNotBlank()) custom else DeepSeekChatRepository.DEFAULT_SYSTEM_PROMPT
+    }
+
+    fun saveSystemPrompt(prompt: String) {
+        prefs.saveCustomSystemPrompt(prompt.trim())
+        PetLogger.d(TAG, "System prompt saved: ${prompt.take(40)}...")
+    }
+
+    fun resetSystemPrompt() {
+        prefs.saveCustomSystemPrompt("")
+        PetLogger.d(TAG, "System prompt reset to default")
+    }
+
+    fun isUsingCustomPrompt(): Boolean = prefs.getCustomSystemPrompt().isNotBlank()
+
+    // ── 消息发送 ──────────────────────────────────────────────────────
 
     fun sendMessage(userText: String, msgId: Long) {
         val apiKey = getApiKey()
@@ -122,52 +144,51 @@ class ChatManager(private val context: Context) {
         history.add(ChatMessage(content = userText, isUser = true))
         if (history.size > MAX_HISTORY) history.removeAt(0)
 
-        val repo = DeepSeekChatRepository(apiKey = apiKey)
+        val repo = DeepSeekChatRepository(
+            apiKey       = apiKey,
+            systemPrompt = getSystemPrompt()
+        )
         val historySnapshot = history.dropLast(1)
 
         currentCall?.cancel()
         currentCall = repo.sendMessage(
-            history = historySnapshot,
+            history     = historySnapshot,
             userMessage = userText,
-            onToken = { token -> broadcastToken(msgId, token) },
-            onDone = { fullReply ->
+            onToken     = { token ->
+                broadcastToken(msgId, token)
+                broadcastBubbleToken(token)
+            },
+            onDone      = { fullReply ->
                 history.add(ChatMessage(content = fullReply, isUser = false))
                 if (history.size > MAX_HISTORY) history.removeAt(0)
-
-                // 回复完成后持久化历史
                 saveHistory()
 
                 val emotionScore = try {
                     (sentimentAnalyzer.analyze(fullReply) * 10).toInt().coerceIn(0, 10)
                 } catch (e: Exception) {
-                    PetLogger.e(TAG, "Sentiment analysis failed", e)
-                    5
+                    PetLogger.e(TAG, "Sentiment analysis failed", e); 5
                 }
                 broadcastDone(msgId, fullReply, emotionScore)
+                broadcastBubbleDone()
                 PetLogger.d(TAG, "Reply done, emotion=$emotionScore")
             },
-            onError = { e ->
+            onError     = { e ->
                 PetLogger.e(TAG, "Chat error", e)
-                // 发送失败时把用户消息从历史移除，避免污染上下文
                 if (history.lastOrNull()?.isUser == true) history.removeAt(history.size - 1)
                 broadcastError(msgId, e.message ?: "网络错误")
             }
         )
     }
 
-    fun cancelCurrent() {
-        currentCall?.cancel()
-        currentCall = null
-    }
+    fun cancelCurrent() { currentCall?.cancel(); currentCall = null }
 
     fun getHistory(): List<ChatMessage> = history.toList()
 
-    // ---- Broadcast helpers ----
+    // ── Broadcast helpers ─────────────────────────────────────────────
 
     private fun broadcastToken(msgId: Long, token: String) {
         context.sendBroadcast(Intent(ACTION_CHAT_TOKEN).apply {
-            putExtra(EXTRA_MSG_ID, msgId)
-            putExtra(EXTRA_TOKEN, token)
+            putExtra(EXTRA_MSG_ID, msgId); putExtra(EXTRA_TOKEN, token)
             setPackage(context.packageName)
         })
     }
@@ -183,8 +204,19 @@ class ChatManager(private val context: Context) {
 
     private fun broadcastError(msgId: Long, errorMsg: String) {
         context.sendBroadcast(Intent(ACTION_CHAT_ERROR).apply {
-            putExtra(EXTRA_MSG_ID, msgId)
-            putExtra(EXTRA_ERROR_MSG, errorMsg)
+            putExtra(EXTRA_MSG_ID, msgId); putExtra(EXTRA_ERROR_MSG, errorMsg)
+            setPackage(context.packageName)
+        })
+    }
+
+    private fun broadcastBubbleToken(token: String) {
+        context.sendBroadcast(Intent(ACTION_BUBBLE_TOKEN).apply {
+            putExtra(EXTRA_TOKEN, token); setPackage(context.packageName)
+        })
+    }
+
+    private fun broadcastBubbleDone() {
+        context.sendBroadcast(Intent(ACTION_BUBBLE_DONE).apply {
             setPackage(context.packageName)
         })
     }

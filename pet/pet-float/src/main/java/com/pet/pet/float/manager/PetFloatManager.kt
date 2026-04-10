@@ -7,6 +7,7 @@ import android.view.WindowManager
 import com.pet.core.common.logger.PetLogger
 import com.pet.core.domain.model.PetPosition
 import com.pet.core.domain.model.event.UserInteractionEvent
+import com.pet.pet.floating.view.PetBubbleView
 import com.pet.pet.floating.view.PetFloatView
 
 /**
@@ -16,6 +17,7 @@ class PetFloatManager(private val context: Context) {
     
     private var windowManager: WindowManager? = null
     private var floatView: PetFloatView? = null
+    private var bubbleView: PetBubbleView? = null
     private var isShowing = false
     private var interactionHandler: ((UserInteractionEvent) -> Unit)? = null
     private var positionSettledListener: ((x: Int, y: Int) -> Unit)? = null
@@ -50,6 +52,12 @@ class PetFloatManager(private val context: Context) {
             floatView = PetFloatView(context).apply {
                 setInteractionHandler(interactionHandler)
                 setPositionSettledListener(positionSettledListener)
+                // 拖动时实时同步气泡位置
+                onPositionChangedListener = { x, y ->
+                    val lp = this.layoutParams as? WindowManager.LayoutParams
+                    val size = lp?.width?.takeIf { it > 0 } ?: 400
+                    bubbleView?.updatePositionIfShowing(x, y, size)
+                }
             }
             val layoutParams = WindowManager.LayoutParams(
                 WindowManager.LayoutParams.WRAP_CONTENT,
@@ -159,5 +167,44 @@ class PetFloatManager(private val context: Context) {
             PetLogger.e("PetFloatManager", "Failed to move pet", e)
         }
     }
+
+    // ---- 气泡相关 ----
+
+    /**
+     * 开始显示气泡（流式输出前调用）
+     */
+    fun showBubble() {
+        val pos = getCurrentPosition() ?: return
+        val lp = floatView?.layoutParams as? WindowManager.LayoutParams
+        val size = lp?.width?.takeIf { it > 0 } ?: 400
+        if (bubbleView == null) bubbleView = PetBubbleView(context)
+        bubbleView?.show(pos.first, pos.second, size)
+    }
+
+    /**
+     * 追加流式 token 到气泡
+     */
+    fun appendBubbleToken(token: String) {
+        bubbleView?.appendToken(token)
+    }
+
+    /**
+     * 回复完成，启动气泡自动隐藏计时
+     */
+    fun onBubbleReplyDone() {
+        bubbleView?.onReplyDone()
+    }
+
+    /**
+     * 立即隐藏气泡
+     */
+    fun hideBubble() {
+        bubbleView?.hide()
+    }
+
+    /**
+     * 气泡是否正在显示
+     */
+    fun isBubbleShowing(): Boolean = bubbleView?.isShowing() == true
 }
 

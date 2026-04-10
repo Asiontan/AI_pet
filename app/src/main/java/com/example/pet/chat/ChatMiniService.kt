@@ -26,6 +26,7 @@ class ChatMiniService : Service() {
         when (intent?.action) {
             ACTION_SHOW -> miniFloatView?.show()
             ACTION_HIDE -> {
+                isShowing = false
                 miniFloatView?.hide()
                 stopSelf()
             }
@@ -34,6 +35,7 @@ class ChatMiniService : Service() {
     }
 
     override fun onDestroy() {
+        isShowing = false
         miniFloatView?.hide()
         super.onDestroy()
     }
@@ -42,13 +44,20 @@ class ChatMiniService : Service() {
         const val ACTION_SHOW = "com.example.pet.chat.SHOW_MINI"
         const val ACTION_HIDE = "com.example.pet.chat.HIDE_MINI"
 
+        /** 全局标记：Mini 悬浮条是否正在显示，供其他组件查询 */
+        @Volatile
+        var isShowing: Boolean = false
+            private set
+
         fun show(context: Context) {
+            isShowing = true
             context.startService(
                 Intent(context, ChatMiniService::class.java).apply { action = ACTION_SHOW }
             )
         }
 
         fun hide(context: Context) {
+            isShowing = false
             context.startService(
                 Intent(context, ChatMiniService::class.java).apply { action = ACTION_HIDE }
             )
