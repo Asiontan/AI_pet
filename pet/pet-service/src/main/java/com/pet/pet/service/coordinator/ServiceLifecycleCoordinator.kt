@@ -16,11 +16,32 @@ import com.pet.algorithm.prediction.BehaviorPredictor
 import com.pet.algorithm.rl.RLBehaviorManager
 import com.pet.algorithm.sentiment.BehaviorEmotionAnalyzer
 import com.pet.algorithm.sentiment.TextSentimentAnalyzer
+import com.pet.algorithm.sentiment.state.UserStateCenter
 import com.pet.core.common.logger.PetLogger
 import com.pet.core.data.model.ModelManager
 import com.pet.core.data.preferences.PetPreferences
+import com.pet.core.domain.model.ExpressionPlan
+import com.pet.core.domain.model.CompanionMode
+import com.pet.core.domain.model.UserMood
 import com.pet.core.domain.model.event.InteractionType
 import com.pet.core.domain.model.event.UserInteractionEvent
+import com.pet.pet.behavior.expression.ExpressionPlanner
+import com.pet.pet.behavior.expression.MemoryAwareBubbleGenerator
+import com.pet.pet.behavior.expression.MicroInterventionPlanner
+import com.pet.pet.behavior.expression.NonverbalInterventionPlanner
+import com.pet.pet.behavior.expression.InterventionSequencer
+import com.pet.pet.behavior.expression.PhaseAwareBubbleGenerator
+import com.pet.pet.behavior.episode.CompanionEpisodeRecorder
+import com.pet.pet.behavior.memory.InteractionMemoryTracker
+import com.pet.pet.behavior.policy.ContextualPolicySelector
+import com.pet.pet.behavior.preference.AdaptivePolicyScorer
+import com.pet.pet.behavior.preference.CompanionStyleProfile
+import com.pet.pet.behavior.relationship.RelationshipPhaseManager
+import com.pet.pet.behavior.preference.PolicyOutcomeAnalyzer
+import com.pet.pet.behavior.preference.PreferenceLearningCenter
+import com.pet.pet.behavior.mind.PetMindEngine
+import com.pet.pet.behavior.policy.CompanionPolicyEngine
+import com.pet.pet.behavior.relationship.RelationshipMemoryManager
 import com.pet.pet.behavior.statemachine.PetBehaviorStateMachine
 import com.pet.pet.floating.manager.PetFloatManager
 import com.pet.pet.service.chat.ChatManager
@@ -56,6 +77,16 @@ class ServiceLifecycleCoordinator(
     private lateinit var behaviorEmotionAnalyzer: BehaviorEmotionAnalyzer
     private lateinit var behaviorPredictor: BehaviorPredictor
     private lateinit var preferences: PetPreferences
+    private lateinit var userStateCenter: UserStateCenter
+    private lateinit var relationshipPhaseManager: RelationshipPhaseManager
+    private lateinit var relationshipMemoryManager: RelationshipMemoryManager
+    private lateinit var petMindEngine: PetMindEngine
+    private lateinit var companionPolicyEngine: CompanionPolicyEngine
+    private lateinit var expressionPlanner: ExpressionPlanner
+    private lateinit var interactionMemoryTracker: InteractionMemoryTracker
+    private lateinit var preferenceLearningCenter: PreferenceLearningCenter
+    private lateinit var policyOutcomeAnalyzer: PolicyOutcomeAnalyzer
+    private lateinit var companionEpisodeRecorder: CompanionEpisodeRecorder
 
     var floatManager: PetFloatManager? = null
     var chatManager: ChatManager? = null
@@ -95,7 +126,11 @@ class ServiceLifecycleCoordinator(
                 ChatManager.ACTION_BUBBLE_DONE -> {
                     floatManager?.onBubbleReplyDone()
                     if (::preferences.isInitialized) {
-                        preferences.addBond(2)
+                        relationshipMemoryManager.recordPositiveInteraction(2)
+                        interactionMemoryTracker.recordChatCompletion()
+                        preferenceLearningCenter.recordChatCompletion()
+                        policyOutcomeAnalyzer.recordOutcome(2)
+                        companionEpisodeRecorder.completeChat()
                         preferences.incrementChatCount()
                         PetLogger.d(TAG, "Chat done: bond=${preferences.getBondLevel()}, chats=${preferences.getTotalChatCount()}")
                     }
@@ -166,6 +201,7 @@ class ServiceLifecycleCoordinator(
         lastUserInteractionMs = serviceStartTimeMs
 
         preferences = PetPreferences(context)
+        preferences.incrementFamiliarityDayIfNeeded()
         rlBehaviorManager = RLBehaviorManager(context, scope)
         behaviorStateMachine = PetBehaviorStateMachine(rlBehaviorManager)
         preferences.saveServiceStartTime(serviceStartTimeMs)
@@ -179,6 +215,16 @@ class ServiceLifecycleCoordinator(
         textSentimentAnalyzer   = TextSentimentAnalyzer(context)
         behaviorEmotionAnalyzer = BehaviorEmotionAnalyzer(context)
         behaviorPredictor       = BehaviorPredictor(context)
+        userStateCenter = UserStateCenter()
+        relationshipPhaseManager = RelationshipPhaseManager(preferences)
+        relationshipMemoryManager = RelationshipMemoryManager(preferences, relationshipPhaseManager)
+        petMindEngine = PetMindEngine(preferences)
+        companionPolicyEngine = CompanionPolicyEngine()
+        expressionPlanner = ExpressionPlanner(PhaseAwareBubbleGenerator(MemoryAwareBubbleGenerator(preferences)), MicroInterventionPlanner(preferences), NonverbalInterventionPlanner(preferences), InterventionSequencer())
+        interactionMemoryTracker = InteractionMemoryTracker(preferences)
+        policyOutcomeAnalyzer = PolicyOutcomeAnalyzer(preferences)
+        preferenceLearningCenter = PreferenceLearningCenter(preferences, ContextualPolicySelector(preferences), AdaptivePolicyScorer(preferences, policyOutcomeAnalyzer), CompanionStyleProfile(preferences, relationshipPhaseManager))
+        companionEpisodeRecorder = CompanionEpisodeRecorder(preferences)
 
         createCareNotifyChannel()
 
@@ -225,7 +271,12 @@ class ServiceLifecycleCoordinator(
         if (!isRunning) return
         lastUserInteractionMs = System.currentTimeMillis()
         if (::preferences.isInitialized) {
-            preferences.addBond(1)
+            relationshipMemoryManager.recordPositiveInteraction(1)
+            interactionMemoryTracker.recordInteraction(lastUserInteractionMs)
+            preferenceLearningCenter.recordPositiveResponse()
+            policyOutcomeAnalyzer.recordOutcome(1)
+            companionEpisodeRecorder.completePositive(lastUserInteractionMs)
+            preferences.saveLastInteractionTime(lastUserInteractionMs)
             PetLogger.d(TAG, "Interaction bond=${preferences.getBondLevel()}")
         }
         scope.launch {
@@ -244,24 +295,91 @@ class ServiceLifecycleCoordinator(
                 rlBehaviorManager.updateEmotion(emotion)
                 applyEmotionExpression(emotion)
 
+                val foregroundApp = behaviorEmotionAnalyzer.getCurrentForegroundApp()
+                val storedMood = preferences.getLastUserMood().takeIf { it.isNotBlank() && it != "UNKNOWN" }
+                val textMood = runCatching { storedMood?.let { com.pet.algorithm.sentiment.EmotionLabel.valueOf(it) } }.getOrNull()
+                val userState = userStateCenter.resolve(
+                    behaviorEmotion = emotion,
+                    textEmotion = textMood,
+                    lastInteractionDeltaMs = System.currentTimeMillis() - lastUserInteractionMs,
+                    foregroundApp = foregroundApp
+                )
+                preferences.saveLastUserMood(userState.mood.name)
+
+                val relationshipState = relationshipMemoryManager.buildState()
+                val petMindState = petMindEngine.buildMindState(userState, relationshipState)
+                val basePolicy = companionPolicyEngine.decide(userState, petMindState, relationshipState)
+                val policy = preferenceLearningCenter.refinePolicy(basePolicy, userState, petMindState, relationshipState)
+                policyOutcomeAnalyzer.recordCurrentContext(policy.mode.name, userState)
+                val modelInfo = ModelManager.findModel(context, ModelManager.getActiveModelId(context))
+                val expressionPlan = expressionPlanner.buildPlan(modelInfo, userState, petMindState, relationshipState, policy)
+                companionEpisodeRecorder.startEpisode(userState, relationshipState, policy)
+                preferences.saveLastCompanionMode(policy.mode.name)
+                logCompanionState(userState.mood, policy.mode.name)
+                applyExpressionPlan(expressionPlan)
+
                 val newState = behaviorStateMachine.updatePeriodic()
-                PetLogger.d(TAG, "Periodic state=$newState")
+                PetLogger.d(TAG, "Periodic state=$newState policy=${policy.mode} petMood=${petMindState.mood}")
 
                 val preds = behaviorPredictor.predictNextHour()
                 if (preds.isNotEmpty()) {
                     preds.forEachIndexed { i, p ->
-                        val name   = behaviorEmotionAnalyzer.getAppName(p.packageName)
+                        val name = behaviorEmotionAnalyzer.getAppName(p.packageName)
                         val minLater = (p.predictedTime - System.currentTimeMillis()) / 60_000L
-                        val pct    = (p.confidence * 100).toInt()
-                        PetLogger.d(TAG, "预测[${i+1}] ~${minLater}min后「$name」置信${pct}%")
+                        val pct = (p.confidence * 100).toInt()
+                        PetLogger.d(TAG, "??[${i + 1}] ~${minLater}min??$name???${pct}%")
                     }
                 } else {
-                    PetLogger.d(TAG, "行为预测：暂无（历史不足）")
+                    PetLogger.d(TAG, "?????????????")
                 }
                 delay(30_000L)
             } catch (e: Exception) {
                 PetLogger.e(TAG, "periodicUpdate error", e)
                 delay(10_000L)
+            }
+        }
+    }
+
+    private fun logCompanionState(userMood: UserMood, policy: String) {
+        PetLogger.d(TAG, "2.0 companion userMood=$userMood policy=$policy bond=${preferences.getBondLevel()} neglect=${preferences.getNeglectLevel()}")
+    }
+
+    private fun applyExpressionPlan(plan: ExpressionPlan) {
+        val fm = floatManager ?: return
+
+        val playExpressionBlock = {
+            plan.expressionName?.let { fm.playExpression(it) }
+            if (plan.clearExpression) fm.playExpression("")
+        }
+        val playMotionBlock = {
+            plan.motionName?.let { fm.playMotionFile(it) }
+        }
+        val playBubbleBlock = {
+            if (!plan.triggerNonverbalOnly && plan.triggerBubble && !plan.bubbleText.isNullOrBlank() && !fm.isBubbleShowing()) {
+                fm.showBubble()
+                plan.bubbleText?.let {
+                    fm.appendBubbleToken(it)
+                }
+                fm.onBubbleReplyDone()
+            }
+        }
+
+        scope.launch {
+            if (plan.motionDelayMs > 0L) delay(plan.motionDelayMs)
+
+            if (plan.expressionFirst) {
+                playExpressionBlock()
+                if (plan.sequenceGapMs > 0L) delay(plan.sequenceGapMs)
+                playMotionBlock()
+            } else {
+                playMotionBlock()
+                if (plan.sequenceGapMs > 0L) delay(plan.sequenceGapMs)
+                playExpressionBlock()
+            }
+
+            if (!plan.triggerNonverbalOnly) {
+                if (plan.bubbleDelayMs > 0L) delay(plan.bubbleDelayMs)
+                playBubbleBlock()
             }
         }
     }
@@ -289,6 +407,11 @@ class ServiceLifecycleCoordinator(
             val idleMs = System.currentTimeMillis() - lastUserInteractionMs
             if (idleMs > BOND_DECAY_IDLE_MS) {
                 preferences.addBond(-1)
+                relationshipMemoryManager.recordPassivePeriod()
+                interactionMemoryTracker.recordPassiveDecay()
+                preferenceLearningCenter.recordPassiveDecay()
+                policyOutcomeAnalyzer.recordOutcome(-1)
+                companionEpisodeRecorder.completePassive()
                 PetLogger.d(TAG, "Bond decay: bond=${preferences.getBondLevel()} idleMs=$idleMs")
             }
         }
@@ -308,6 +431,11 @@ class ServiceLifecycleCoordinator(
             if (idleMs >= CARE_IDLE_THRESHOLD_MS && (now - lastNotify) >= CARE_NOTIFY_COOLDOWN_MS) {
                 sendCareNotification()
                 preferences.saveLastCareNotifyTime(now)
+                relationshipMemoryManager.recordIgnoredSuggestion()
+                interactionMemoryTracker.recordIgnoredCare()
+                preferenceLearningCenter.recordIgnoredCare()
+                policyOutcomeAnalyzer.recordOutcome(-1)
+                companionEpisodeRecorder.completeIgnored()
             }
         }
     }
@@ -397,7 +525,7 @@ class ServiceLifecycleCoordinator(
         // POINT 手势直接打开聊天（与长按宠物效果一致）
         if (gesture == Gesture.POINT) {
             lastUserInteractionMs = System.currentTimeMillis()
-            if (::preferences.isInitialized) preferences.addBond(1)
+            if (::preferences.isInitialized) { relationshipMemoryManager.recordPositiveInteraction(1); interactionMemoryTracker.recordInteraction(lastUserInteractionMs) }
             // 先打开聊天，300ms 后再更新情绪避免同帧卡顿
             onOpenChat?.invoke()
             scope.launch {
@@ -411,7 +539,7 @@ class ServiceLifecycleCoordinator(
         // FIST 手势打开抖音
         if (gesture == Gesture.FIST) {
             lastUserInteractionMs = System.currentTimeMillis()
-            if (::preferences.isInitialized) preferences.addBond(1)
+            if (::preferences.isInitialized) { relationshipMemoryManager.recordPositiveInteraction(1); interactionMemoryTracker.recordInteraction(lastUserInteractionMs) }
             applyEmotionFromChat(6)
             launchDouyinOrToast()
             PetLogger.d(TAG, "Gesture FIST: launching Douyin")
@@ -421,7 +549,7 @@ class ServiceLifecycleCoordinator(
         // THUMBS_UP 手势打开微信
         if (gesture == Gesture.THUMBS_UP) {
             lastUserInteractionMs = System.currentTimeMillis()
-            if (::preferences.isInitialized) preferences.addBond(1)
+            if (::preferences.isInitialized) { relationshipMemoryManager.recordPositiveInteraction(1); interactionMemoryTracker.recordInteraction(lastUserInteractionMs) }
             applyEmotionFromChat(8)
             launchWechatOrToast()
             PetLogger.d(TAG, "Gesture THUMBS_UP: launching WeChat")
@@ -431,7 +559,7 @@ class ServiceLifecycleCoordinator(
         // PEACE 手势返回桌面
         if (gesture == Gesture.PEACE) {
             lastUserInteractionMs = System.currentTimeMillis()
-            if (::preferences.isInitialized) preferences.addBond(1)
+            if (::preferences.isInitialized) { relationshipMemoryManager.recordPositiveInteraction(1); interactionMemoryTracker.recordInteraction(lastUserInteractionMs) }
             applyEmotionFromChat(7)
             goHome()
             PetLogger.d(TAG, "Gesture PEACE: go home")
@@ -441,7 +569,7 @@ class ServiceLifecycleCoordinator(
         // WAVE 手势在当前前台 App 执行下滑
         if (gesture == Gesture.WAVE) {
             lastUserInteractionMs = System.currentTimeMillis()
-            if (::preferences.isInitialized) preferences.addBond(1)
+            if (::preferences.isInitialized) { relationshipMemoryManager.recordPositiveInteraction(1); interactionMemoryTracker.recordInteraction(lastUserInteractionMs) }
             applyEmotionFromChat(6)
             performSwipeDown()
             PetLogger.d(TAG, "Gesture WAVE: swipe down")

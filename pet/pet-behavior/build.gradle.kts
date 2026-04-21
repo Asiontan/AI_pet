@@ -25,6 +25,7 @@ dependencies {
     implementation(project(":core:core-common"))
     implementation(project(":core:core-domain"))
     implementation(project(":core:core-eventbus"))
+    implementation(project(":core:core-data"))
     implementation(project(":pet:pet-render"))
     implementation(project(":algorithm:algorithm-rl"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
