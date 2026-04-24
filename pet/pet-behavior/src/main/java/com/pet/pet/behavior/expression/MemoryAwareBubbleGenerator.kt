@@ -40,7 +40,6 @@ class MemoryAwareBubbleGenerator(
         }
 
         return chosen?.also { preferences.saveLastGlobalBubbleText(it) }
-        }
     }
 
     /**
