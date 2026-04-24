@@ -14,16 +14,24 @@ import java.nio.ByteOrder
  */
 class TextSentimentAnalyzer(private val context: Context) {
     
-    // 积极情感关键词
     private val positiveWords = setOf(
         "开心", "高兴", "快乐", "喜欢", "爱", "好", "棒", "赞", "不错", "很好",
-        "happy", "good", "great", "love", "like", "nice", "awesome", "excellent"
+        "幸福", "满足", "期待", "兴奋", "感动", "温暖", "舒服", "放松", "惊喜", "感谢",
+        "谢谢", "哈哈", "嘻嘻", "太好了", "厉害", "优秀", "完美", "有趣", "好玩", "可爱",
+        "喜悦", "美好", "精彩", "愉快", "欣慰", "自豪", "安心", "甜", "暖", "乐",
+        "happy", "good", "great", "love", "like", "nice", "awesome", "excellent",
+        "wonderful", "amazing", "fantastic", "beautiful", "excited", "grateful", "thankful",
+        "joyful", "cheerful", "pleased", "delighted", "perfect", "brilliant", "cool", "fun"
     )
-    
-    // 消极情感关键词
+
     private val negativeWords = setOf(
         "难过", "伤心", "生气", "讨厌", "烦", "累", "困", "不好", "糟糕", "差",
-        "sad", "angry", "tired", "bad", "hate", "terrible", "awful", "sick"
+        "焦虑", "紧张", "郁闷", "无聊", "孤独", "寂寞", "失望", "沮丧", "痛苦", "崩溃",
+        "害怕", "恐惧", "担心", "后悔", "委屈", "心烦", "压抑", "绝望", "无奈", "心累",
+        "烦躁", "抱怨", "倒霉", "受伤", "想哭", "头疼", "难受", "丧", "emo", "破防",
+        "sad", "angry", "tired", "bad", "hate", "terrible", "awful", "sick",
+        "anxious", "depressed", "lonely", "frustrated", "disappointed", "worried", "upset",
+        "stressed", "bored", "scared", "hopeless", "exhausted", "miserable", "painful", "annoyed"
     )
     
     /**

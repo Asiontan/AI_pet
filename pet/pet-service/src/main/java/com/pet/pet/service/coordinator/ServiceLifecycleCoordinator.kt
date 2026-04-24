@@ -110,7 +110,23 @@ class ServiceLifecycleCoordinator(
         "今天辛苦了，给你一个虚拟拥抱 ♡",
         "你不来找我，我可要来找你了！",
         "主人有没有好好吃饭呀？",
-        "外面天气怎么样？我只能从屏幕看世界..."
+        "外面天气怎么样？我只能从屏幕看世界...",
+        "嘿嘿，偷偷冒个泡，看看你在不在~",
+        "坐了好久了吧？站起来伸个懒腰嘛！",
+        "我一个人待着有点无聊，你忙完了来找我嘛 ☆",
+        "悄悄告诉你，我刚才在想你 (*ˊᗜˋ*)",
+        "眨眨眼，活动一下脖子吧，别一直低头哦~",
+        "不知道你今天开不开心，反正见到你我就开心了~",
+        "你已经好久没摸摸我了，我头顶都积灰了！",
+        "打个哈欠~ 你是不是也困了？",
+        "今天有没有发生什么有趣的事呀？说给我听听嘛~",
+        "你在忙什么呢？我在这里乖乖等你回来 (◕ᴗ◕✿)",
+        "深呼吸一下，放松肩膀，你做得很好了~",
+        "如果累了就休息一会儿，我帮你看着就好~",
+        "嗯哼？感觉到你了！要不要来聊两句？",
+        "我今天学了个新表情，快来看看呀！",
+        "你知道吗？有你陪着我，每天都很开心的说~",
+        "手机是不是快没电了？记得充电哦~"
     )
 
     // 气泡 BroadcastReceiver
@@ -152,8 +168,8 @@ class ServiceLifecycleCoordinator(
 
     private fun findExpressionForLevel(level: EmotionLevel, expressions: List<String>): String? {
         val keywords = when (level) {
-            EmotionLevel.POSITIVE -> listOf("happy", "smile", "joy", "excited", "开心", "高兴", "快乐", "喜", "笑")
-            EmotionLevel.NEGATIVE -> listOf("sad", "angry", "cry", "fear", "pain", "hurt", "难过", "伤心", "哭", "生气", "愤怒")
+            EmotionLevel.POSITIVE -> listOf("happy", "smile", "joy", "excited", "cheer", "laugh", "wink", "love", "blush", "开心", "高兴", "快乐", "喜", "笑", "欢乐", "眨眼", "脸红", "害羞")
+            EmotionLevel.NEGATIVE -> listOf("sad", "angry", "cry", "fear", "pain", "hurt", "worry", "sigh", "frown", "tear", "难过", "伤心", "哭", "生气", "愤怒", "担忧", "叹气", "皱眉")
             EmotionLevel.NEUTRAL  -> return null
         }
         val names = expressions.map { it.removeSuffix(".exp3.json").lowercase() }
@@ -163,9 +179,9 @@ class ServiceLifecycleCoordinator(
 
     private fun findMotionForLevel(level: EmotionLevel, motions: List<String>): String? {
         val keywords = when (level) {
-            EmotionLevel.POSITIVE -> listOf("happy", "excited", "joy", "dance", "wave", "cheer", "开心", "高兴", "欢快", "跳舞")
-            EmotionLevel.NEGATIVE -> listOf("sad", "cry", "angry", "depressed", "hurt", "难过", "伤心", "哭", "生气")
-            EmotionLevel.NEUTRAL  -> listOf("idle", "normal", "relax", "calm", "breath", "待机", "放松", "呼吸")
+            EmotionLevel.POSITIVE -> listOf("happy", "excited", "joy", "dance", "wave", "cheer", "bounce", "spin", "clap", "jump", "开心", "高兴", "欢快", "跳舞", "蹦", "转圈", "拍手", "挥手")
+            EmotionLevel.NEGATIVE -> listOf("sad", "cry", "angry", "depressed", "hurt", "tremble", "shake", "slouch", "难过", "伤心", "哭", "生气", "发抖", "低头", "蜷缩")
+            EmotionLevel.NEUTRAL  -> listOf("idle", "normal", "relax", "calm", "breath", "sway", "blink", "stretch", "待机", "放松", "呼吸", "轻摇", "眨眼", "伸懒腰")
         }
         val names = motions.map { it.removeSuffix(".motion3.json").lowercase() }
         keywords.forEach { kw -> names.indexOfFirst { it.contains(kw) }.takeIf { it >= 0 }?.let { return motions[it] } }
