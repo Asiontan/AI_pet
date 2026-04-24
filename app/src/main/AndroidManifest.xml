@@ -55,6 +55,11 @@
             android:label="切换模型" />
 
         <activity
+            android:name=".LoginActivity"
+            android:exported="false"
+            android:label="云端账号" />
+
+        <activity
             android:name=".chat.ChatDialogActivity"
             android:exported="false"
             android:label="和宠物聊天"

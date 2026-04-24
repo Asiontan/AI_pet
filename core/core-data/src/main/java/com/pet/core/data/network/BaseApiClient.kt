@@ -124,6 +124,56 @@ abstract class BaseApiClient(
     ): ApiResult<String> = postJson(path, jsonBody, headers) { it }
 
     // ----------------------------------------------------------------
+    // PUT JSON
+    // ----------------------------------------------------------------
+
+    /**
+     * PUT JSON 请求
+     */
+    suspend fun <T> putJson(
+        path: String,
+        jsonBody: String,
+        headers: Map<String, String> = emptyMap(),
+        parse: (String) -> T
+    ): ApiResult<T> {
+        val body = jsonBody.toRequestBody(jsonMediaType)
+        val request = Request.Builder()
+            .url(baseUrl + path)
+            .put(body)
+            .applyHeaders(headers)
+            .build()
+        return execute(request, parse)
+    }
+
+    /**
+     * PUT JSON 请求（返回原始字符串）
+     */
+    suspend fun putJson(
+        path: String,
+        jsonBody: String,
+        headers: Map<String, String> = emptyMap()
+    ): ApiResult<String> = putJson(path, jsonBody, headers) { it }
+
+    // ----------------------------------------------------------------
+    // DELETE
+    // ----------------------------------------------------------------
+
+    /**
+     * DELETE 请求
+     */
+    suspend fun delete(
+        path: String,
+        headers: Map<String, String> = emptyMap()
+    ): ApiResult<String> {
+        val request = Request.Builder()
+            .url(baseUrl + path)
+            .delete()
+            .applyHeaders(headers)
+            .build()
+        return execute(request) { it }
+    }
+
+    // ----------------------------------------------------------------
     // 内部执行逻辑
     // ----------------------------------------------------------------
 

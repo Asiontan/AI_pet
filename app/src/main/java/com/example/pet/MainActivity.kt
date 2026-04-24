@@ -144,6 +144,10 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, ModelSwitchActivity::class.java))
         }
 
+        findViewById<MaterialButton>(R.id.btnCloudAccount).setOnClickListener {
+            startActivity(Intent(this, LoginActivity::class.java))
+        }
+
         // 恢复手势开关的持久化状态
         val gestureEnabled = petPreferences.isGestureRecognitionEnabled()
         switchGesture.isChecked = gestureEnabled

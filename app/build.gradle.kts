@@ -24,6 +24,12 @@ android {
         buildConfigField("String", "DEEPSEEK_API_KEY",
             "\"${localProps.getProperty("DEEPSEEK_API_KEY", "")}\""
         )
+        buildConfigField("String", "BMOB_APP_ID",
+            "\"${localProps.getProperty("BMOB_APP_ID", "")}\""
+        )
+        buildConfigField("String", "BMOB_REST_API_KEY",
+            "\"${localProps.getProperty("BMOB_REST_API_KEY", "")}\""
+        )
     }
 
     buildTypes {

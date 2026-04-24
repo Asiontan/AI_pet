@@ -304,6 +304,15 @@
                 android:layout_marginTop="8dp"
                 android:text="切换模型" />
 
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnCloudAccount"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="☁️ 云端账号"
+                app:strokeColor="#BBA0FF" />
+
         </LinearLayout>
 
         <!-- 手势识别开关卡片 -->

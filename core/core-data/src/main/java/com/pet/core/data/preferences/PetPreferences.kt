@@ -423,6 +423,47 @@ class PetPreferences(context: Context) {
     fun getCustomSystemPrompt(): String =
         prefs.getString(KEY_CUSTOM_SYSTEM_PROMPT, "") ?: ""
 
+    // ── Bmob 云端登录态 ──────────────────────────────────────────────
+    fun saveBmobSessionToken(token: String) {
+        prefs.edit().putString(KEY_BMOB_SESSION_TOKEN, token).apply()
+    }
+
+    fun getBmobSessionToken(): String =
+        prefs.getString(KEY_BMOB_SESSION_TOKEN, "") ?: ""
+
+    fun saveBmobUserId(objectId: String) {
+        prefs.edit().putString(KEY_BMOB_USER_ID, objectId).apply()
+    }
+
+    fun getBmobUserId(): String =
+        prefs.getString(KEY_BMOB_USER_ID, "") ?: ""
+
+    fun saveBmobUsername(username: String) {
+        prefs.edit().putString(KEY_BMOB_USERNAME, username).apply()
+    }
+
+    fun getBmobUsername(): String =
+        prefs.getString(KEY_BMOB_USERNAME, "") ?: ""
+
+    /** 云端宠物数据的 objectId，用于增量更新 */
+    fun saveBmobPetDataId(objectId: String) {
+        prefs.edit().putString(KEY_BMOB_PET_DATA_ID, objectId).apply()
+    }
+
+    fun getBmobPetDataId(): String =
+        prefs.getString(KEY_BMOB_PET_DATA_ID, "") ?: ""
+
+    fun clearBmobSession() {
+        prefs.edit()
+            .remove(KEY_BMOB_SESSION_TOKEN)
+            .remove(KEY_BMOB_USER_ID)
+            .remove(KEY_BMOB_USERNAME)
+            .remove(KEY_BMOB_PET_DATA_ID)
+            .apply()
+    }
+
+    fun isBmobLoggedIn(): Boolean = getBmobSessionToken().isNotEmpty()
+
     // ── 清除 ──────────────────────────────────────────────────────────
     suspend fun clearAll() = withContext(Dispatchers.IO) {
         prefs.edit().clear().apply()
@@ -493,5 +534,9 @@ class PetPreferences(context: Context) {
         private const val KEY_LAST_CARE_NOTIFY_TIME   = "last_care_notify_time"
         private const val KEY_CUSTOM_SYSTEM_PROMPT    = "custom_system_prompt"
         private const val KEY_GESTURE_RECOGNITION_ENABLED = "gesture_recognition_enabled"
+        private const val KEY_BMOB_SESSION_TOKEN    = "bmob_session_token"
+        private const val KEY_BMOB_USER_ID          = "bmob_user_id"
+        private const val KEY_BMOB_USERNAME          = "bmob_username"
+        private const val KEY_BMOB_PET_DATA_ID      = "bmob_pet_data_id"
     }
 }
