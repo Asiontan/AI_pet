@@ -407,6 +407,14 @@ class PetPreferences(context: Context) {
 
     fun getLastCareNotifyTime(): Long = prefs.getLong(KEY_LAST_CARE_NOTIFY_TIME, 0L)
 
+    // ── 休闲场景（刷视频/玩游戏）气泡冷却 ───────────────────────────────
+    fun saveLastEntertainmentBubbleTime(ts: Long) {
+        prefs.edit().putLong(KEY_LAST_ENTERTAINMENT_BUBBLE_TIME, ts).apply()
+    }
+
+    fun getLastEntertainmentBubbleTime(): Long =
+        prefs.getLong(KEY_LAST_ENTERTAINMENT_BUBBLE_TIME, 0L)
+
     // ── 手势识别开关 ──────────────────────────────────────────────────
     fun setGestureRecognitionEnabled(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_GESTURE_RECOGNITION_ENABLED, enabled).apply()
@@ -532,6 +540,7 @@ class PetPreferences(context: Context) {
         private const val KEY_STYLE_WEIGHT_PREFIX     = "style_weight_"
         private const val KEY_RELATIONSHIP_PHASE      = "relationship_phase"
         private const val KEY_LAST_CARE_NOTIFY_TIME   = "last_care_notify_time"
+        private const val KEY_LAST_ENTERTAINMENT_BUBBLE_TIME = "last_entertainment_bubble_time"
         private const val KEY_CUSTOM_SYSTEM_PROMPT    = "custom_system_prompt"
         private const val KEY_GESTURE_RECOGNITION_ENABLED = "gesture_recognition_enabled"
         private const val KEY_BMOB_SESSION_TOKEN    = "bmob_session_token"

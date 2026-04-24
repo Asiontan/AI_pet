@@ -38,7 +38,7 @@ class MemoryAwareBubbleGenerator(
     private fun entertainmentInterrupt(userState: UserState): String? {
         if (userState.lifeContext != LifeContext.RESTING) return null
         val now = System.currentTimeMillis()
-        val last = preferences.getLong("last_entertainment_bubble_ts", 0L)
+        val last = preferences.getLastEntertainmentBubbleTime()
         if (now - last < entertainmentBubbleCooldownMs) return null
         // 心情很糟/压力大时不打扰（让 gentle/emotional 逻辑接管）
         if (userState.mood in listOf(UserMood.SAD, UserMood.STRESSED)) return null
@@ -53,7 +53,7 @@ class MemoryAwareBubbleGenerator(
             "${hourHint}刷着刷着就过去好久了……要不要休息 1 分钟？"
         ).random()
 
-        preferences.putLong("last_entertainment_bubble_ts", now)
+        preferences.saveLastEntertainmentBubbleTime(now)
         return msg
     }
 
