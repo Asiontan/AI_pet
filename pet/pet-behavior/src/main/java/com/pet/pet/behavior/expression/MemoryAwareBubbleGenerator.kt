@@ -20,14 +20,26 @@ class MemoryAwareBubbleGenerator(
         relationshipState: RelationshipState,
         policy: CompanionPolicy
     ): String? {
-        entertainmentInterrupt(userState)?.let { return it }
-        return when (policy.mode) {
-            CompanionMode.GENTLE_CARE -> gentleCareText(userState, relationshipState)
-            CompanionMode.PROACTIVE_HELP -> proactiveHelpText(userState, relationshipState)
-            CompanionMode.PLAYFUL_INTERACTION -> playfulText(userState, petMindState, relationshipState)
-            CompanionMode.EMOTIONAL_SUPPORT -> emotionalSupportText(userState, relationshipState)
-            CompanionMode.QUIET_COMPANION,
-            CompanionMode.DO_NOT_DISTURB -> null
+        val last = preferences.getLastGlobalBubbleText()
+        var chosen: String? = null
+
+        repeat(3) {
+            val candidate = entertainmentInterrupt(userState)
+                ?: when (policy.mode) {
+                    CompanionMode.GENTLE_CARE -> gentleCareText(userState, relationshipState)
+                    CompanionMode.PROACTIVE_HELP -> proactiveHelpText(userState, relationshipState)
+                    CompanionMode.PLAYFUL_INTERACTION -> playfulText(userState, petMindState, relationshipState)
+                    CompanionMode.EMOTIONAL_SUPPORT -> emotionalSupportText(userState, relationshipState)
+                    CompanionMode.QUIET_COMPANION,
+                    CompanionMode.DO_NOT_DISTURB -> null
+                }
+
+            if (candidate.isNullOrBlank()) return null
+            chosen = candidate
+            if (candidate != last) return@repeat
+        }
+
+        return chosen?.also { preferences.saveLastGlobalBubbleText(it) }
         }
     }
 
