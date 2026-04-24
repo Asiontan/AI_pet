@@ -12,12 +12,15 @@ import com.pet.core.domain.model.UserState
 class MemoryAwareBubbleGenerator(
     private val preferences: PetPreferences
 ) {
+    private val entertainmentBubbleCooldownMs = 4 * 60_000L
+
     fun generate(
         userState: UserState,
         petMindState: PetMindState,
         relationshipState: RelationshipState,
         policy: CompanionPolicy
     ): String? {
+        entertainmentInterrupt(userState)?.let { return it }
         return when (policy.mode) {
             CompanionMode.GENTLE_CARE -> gentleCareText(userState, relationshipState)
             CompanionMode.PROACTIVE_HELP -> proactiveHelpText(userState, relationshipState)
@@ -26,6 +29,32 @@ class MemoryAwareBubbleGenerator(
             CompanionMode.QUIET_COMPANION,
             CompanionMode.DO_NOT_DISTURB -> null
         }
+    }
+
+    /**
+     * 刷视频/玩游戏时，偶尔插入一条轻量互动气泡。
+     * 用本地时间戳做简单冷却，避免每 30 秒都弹。
+     */
+    private fun entertainmentInterrupt(userState: UserState): String? {
+        if (userState.lifeContext != LifeContext.RESTING) return null
+        val now = System.currentTimeMillis()
+        val last = preferences.getLong("last_entertainment_bubble_ts", 0L)
+        if (now - last < entertainmentBubbleCooldownMs) return null
+        // 心情很糟/压力大时不打扰（让 gentle/emotional 逻辑接管）
+        if (userState.mood in listOf(UserMood.SAD, UserMood.STRESSED)) return null
+
+        val hourHint = timeHint(userState.lifeContext)
+        val msg = listOf(
+            "${hourHint}在刷视频呀？给我留个小角落嘛~",
+            "${hourHint}这个看起来好有趣！要不要也分我一点快乐？",
+            "${hourHint}你是不是又沉浸了？眨眨眼、放松一下肩膀~",
+            "${hourHint}玩游戏的话我给你加油！别忘了喝水哦。",
+            "${hourHint}打到哪一关啦？我在旁边当应援团！",
+            "${hourHint}刷着刷着就过去好久了……要不要休息 1 分钟？"
+        ).random()
+
+        preferences.putLong("last_entertainment_bubble_ts", now)
+        return msg
     }
 
     private fun gentleCareText(

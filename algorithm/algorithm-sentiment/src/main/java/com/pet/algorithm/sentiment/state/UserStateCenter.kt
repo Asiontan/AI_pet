@@ -40,9 +40,41 @@ class UserStateCenter {
         foregroundApp?.contains("code", ignoreCase = true) == true ||
             foregroundApp?.contains("studio", ignoreCase = true) == true ||
             foregroundApp?.contains("docs", ignoreCase = true) == true -> LifeContext.WORKING
-        foregroundApp?.contains("bili", ignoreCase = true) == true ||
-            foregroundApp?.contains("douyin", ignoreCase = true) == true -> LifeContext.RESTING
+        isEntertainmentOrGameApp(foregroundApp) -> LifeContext.RESTING
         else -> LifeContext.UNKNOWN
+    }
+
+    private fun isEntertainmentOrGameApp(foregroundApp: String?): Boolean {
+        val pkg = foregroundApp?.lowercase() ?: return false
+        // 视频/娱乐
+        if (
+            pkg.contains("bili") ||
+            pkg.contains("douyin") ||
+            pkg.contains("aweme") ||
+            pkg.contains("kuaishou") ||
+            pkg.contains("iqiyi") ||
+            pkg.contains("youku") ||
+            pkg.contains("tencent") && pkg.contains("video") ||
+            pkg.contains("netflix") ||
+            pkg.contains("youtube") ||
+            pkg.contains("music")
+        ) return true
+
+        // 游戏（包名/渠道常见特征，尽量宽松）
+        if (
+            pkg.contains(".game") ||
+            pkg.contains("games") ||
+            pkg.contains("moba") ||
+            pkg.contains("arena") ||
+            pkg.contains("pvp") ||
+            pkg.contains("rpg") ||
+            pkg.contains("tencent.tmgp") ||
+            pkg.contains("netease") && pkg.contains("game") ||
+            pkg.contains("mi") && pkg.contains("game") ||
+            pkg.contains("huawei") && pkg.contains("game")
+        ) return true
+
+        return false
     }
 
     private fun resolveMood(
